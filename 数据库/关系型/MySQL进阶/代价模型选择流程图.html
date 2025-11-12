@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MySQL Cost Model Analysis Flowchart</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 28px;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        
+        .flowchart {
+            position: relative;
+            padding: 20px;
+        }
+        
+        .flow-node {
+            background: white;
+            border: 3px solid #3498db;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 800px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        
+        .flow-node:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+        }
+        
+        .flow-node.start {
+            border-color: #2ecc71;
+            background: linear-gradient(135deg, #f0fff4 0%, #e8f8f5 100%);
+        }
+        
+        .flow-node.decision {
+            border-color: #f39c12;
+            background: linear-gradient(135deg, #fff9e6 0%, #fef5e7 100%);
+            clip-path: polygon(10% 0%, 90% 0%, 100% 50%, 90% 100%, 10% 100%, 0% 50%);
+            padding: 30px 40px;
+        }
+        
+        .flow-node.process {
+            border-color: #3498db;
+            background: linear-gradient(135deg, #ebf5fb 0%, #d6eaf8 100%);
+        }
+        
+        .flow-node.cost-calc {
+            border-color: #9b59b6;
+            background: linear-gradient(135deg, #f4ecf7 0%, #ebdef0 100%);
+        }
+        
+        .flow-node.result {
+            border-color: #e74c3c;
+            background: linear-gradient(135deg, #fadbd8 0%, #f5b7b1 100%);
+        }
+        
+        .flow-node.end {
+            border-color: #27ae60;
+            background: linear-gradient(135deg, #d5f4e6 0%, #abebc6 100%);
+            border-width: 4px;
+        }
+        
+        .node-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #2c3e50;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .node-title-en {
+            font-size: 14px;
+            color: #7f8c8d;
+            font-weight: normal;
+            font-style: italic;
+        }
+        
+        .node-content {
+            color: #34495e;
+            line-height: 1.8;
+            font-size: 14px;
+        }
+        
+        .node-details {
+            background: rgba(255,255,255,0.7);
+            padding: 12px;
+            border-radius: 8px;
+            margin-top: 10px;
+            border-left: 4px solid #3498db;
+        }
+        
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 8px 0;
+            overflow-x: auto;
+        }
+        
+        .highlight {
+            background: #fff3cd;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-weight: bold;
+            color: #856404;
+        }
+        
+        .arrow {
+            text-align: center;
+            color: #3498db;
+            font-size: 30px;
+            margin: -10px 0;
+            font-weight: bold;
+        }
+        
+        .branch-container {
+            display: flex;
+            gap: 20px;
+            margin: 20px 0;
+            flex-wrap: wrap;
+        }
+        
+        .branch {
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .metric-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+        
+        .metric-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+            text-align: center;
+        }
+        
+        .metric-label {
+            font-size: 12px;
+            color: #7f8c8d;
+            margin-bottom: 5px;
+        }
+        
+        .metric-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2c3e50;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: bold;
+            margin-left: 8px;
+        }
+        
+        .badge.success {
+            background: #d5f4e6;
+            color: #27ae60;
+        }
+        
+        .badge.warning {
+            background: #fff3cd;
+            color: #f39c12;
+        }
+        
+        .badge.info {
+            background: #d6eaf8;
+            color: #3498db;
+        }
+        
+        .icon {
+            font-size: 24px;
+            margin-right: 8px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 15px;
+            }
+            
+            h1 {
+                font-size: 22px;
+            }
+            
+            .flow-node {
+                padding: 15px;
+            }
+            
+            .metric-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 MySQL查询优化器代价模型分析流程</h1>
+        <p class="subtitle">MySQL Query Optimizer Cost Model Analysis Flowchart</p>
+        
+        <div class="flowchart">
+            <!-- 1. 查询解析 -->
+            <div class="flow-node start">
+                <div class="node-title">
+                    <span class="icon">🚀</span>
+                    <div>
+                        <div>1. 查询解析阶段</div>
+                        <div class="node-title-en">Query Parsing Phase</div>
+                    </div>
+                </div>
+                <div class="node-content">
+                    <strong>接收SQL查询：</strong>Receive SQL Query<br>
+                    <div class="code-block">
+SELECT wind_code, trade_date, latest_price, total_volume<br>
+FROM tb_quotation_index_history_trend<br>
+WHERE wind_code = '000001.SH'<br>
+  AND trade_date BETWEEN '2024-10-01' AND '2025-10-02'
+                    </div>
+                    <div class="node-details">
+                        <strong>📊 查询类型识别 | Query Type Identification:</strong><br>
+                        • 单表查询 (Single Table Query) - <span class="highlight">select_id = 1</span><br>
+                        • 无子查询/UNION (No Subquery/UNION)<br>
+                        • 简单查询块 (Simple Query Block)
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- 2. 索引识别 -->
+            <div class="flow-node process">
+                <div class="node-title">
+                    <span class="icon">🔑</span>
+                    <div>
+                        <div>2. 可用索引识别</div>
+                        <div class="node-title-en">Available Index Identification</div>
+                    </div>
+                </div>
+                <div class="node-content">
+                    <strong>优化器扫描表结构，找出所有可能用到的索引：</strong><br>
+                    <em>Optimizer scans table structure to find all potential indexes</em>
+                    
+                    <div class="node-details">
+                        <strong>📌 Possible Keys 可选索引列表:</strong><br>
+                        <div class="metric-grid">
+                            <div class="metric-card">
+                                <div class="metric-label">索引1 | Index 1</div>
+                                <div class="metric-value" style="font-size: 14px;">uniq_windcode_tradedate</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">唯一联合索引<br>Unique Composite Index</div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-label">索引2 | Index 2</div>
+                                <div class="metric-value" style="font-size: 14px;">idx_windcode_tradedate_price</div>
+                                <div style="font-size: 12px; color: #7f8c8d; margin-top: 5px;">覆盖索引<br>Covering Index</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="node-details" style="margin-top: 15px;">
+                        <strong>🎯 索引匹配分析 | Index Matching Analysis:</strong><br>
+                        • WHERE条件涉及: <span class="highlight">wind_code</span> (等值) + <span class="highlight">trade_date</span> (范围)<br>
+                        • 两个索引的前缀都完美匹配 (Both indexes match perfectly)<br>
+                        • 符合最左前缀原则 (Follows leftmost prefix principle)
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- 3. 代价计算 -->
+            <div class="flow-node decision">
+                <div class="node-title">
+                    <span class="icon">⚖️</span>
+                    <div>
+                        <div>3. 代价模型计算与索引选择</div>
+                        <div class="node-title-en">Cost Model Calculation & Index Selection</div>
+                    </div>
+                </div>
+                <div class="node-content">
+                    <strong>为每个候选索引计算执行代价：</strong><br>
+                    <em>Calculate execution cost for each candidate index</em>
+                    
+                    <div class="branch-container">
+                        <div class="branch">
+                            <div class="node-details">
+                                <strong>🔵 方案A | Plan A:</strong><br>
+                                <strong>uniq_windcode_tradedate</strong>
+                                <div style="margin-top: 10px;">
+                                    <strong>优点 Advantages:</strong><br>
+                                    • 唯一索引，过滤性好<br>
+                                    <em style="font-size: 12px;">Unique index, good filtering</em><br>
+                                    • 索引基数高<br>
+                                    <em style="font-size: 12px;">High index cardinality</em>
+                                </div>
+                                <div style="margin-top: 10px;">
+                                    <strong>缺点 Disadvantages:</strong><br>
+                                    • ❌ 需要回表查询<br>
+                                    <em style="font-size: 12px;">Requires table lookup</em><br>
+                                    • ❌ latest_price, total_volume不在索引中<br>
+                                    <em style="font-size: 12px;">Columns not in index</em><br>
+                                    • ❌ 额外的随机I/O开销<br>
+                                    <em style="font-size: 12px;">Extra random I/O cost</em>
+                                </div>
+                                <div style="margin-top: 10px; padding: 8px; background: #fadbd8; border-radius: 5px;">
+                                    <strong>估算代价 Estimated Cost:</strong><br>
+                                    读取代价 (Read) + 回表代价 (Lookup)<br>
+                                    ≈ <span class="highlight">28000+</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="branch">
+                            <div class="node-details">
+                                <strong>🟢 方案B | Plan B:</strong><br>
+                                <strong>idx_windcode_tradedate_price</strong>
+                                <span class="badge success">✓ 最优 BEST</span>
+                                <div style="margin-top: 10px;">
+                                    <strong>优点 Advantages:</strong><br>
+                                    • ✅ 覆盖索引 (Covering Index)<br>
+                                    • ✅ 所有查询列都在索引中<br>
+                                    <em style="font-size: 12px;">All query columns included</em><br>
+                                    • ✅ 无需回表，纯索引扫描<br>
+                                    <em style="font-size: 12px;">No table lookup needed</em><br>
+                                    • ✅ 顺序I/O，效率高<br>
+                                    <em style="font-size: 12px;">Sequential I/O, efficient</em>
+                                </div>
+                                <div style="margin-top: 10px;">
+                                    <strong>索引列 Index Columns:</strong><br>
+                                    <code style="font-size: 12px;">wind_code + trade_date + latest_price + total_volume</code>
+                                </div>
+                                <div style="margin-top: 10px; padding: 8px; background: #d5f4e6; border-radius: 5px;">
+                                    <strong>估算代价 Estimated Cost:</strong><br>
+                                    读取代价 (Read): 13013.46<br>
+                                    评估代价 (Eval): 11043.40<br>
+                                    <strong>总计 Total: <span class="highlight">24056.86</span></strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="node-details" style="margin-top: 15px; background: #d5f4e6;">
+                        <strong>🎯 优化器决策 | Optimizer Decision:</strong><br>
+                        选择方案B: <span class="highlight">idx_windcode_tradedate_price</span><br>
+                        <em>Select Plan B: idx_windcode_tradedate_price</em><br>
+                        <strong>原因 Reason:</strong> 覆盖索引避免回表，总代价更低 (Covering index avoids table lookup, lower total cost)
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- 4. 执行计划细节 -->
+            <div class="flow-node cost-calc">
+                <div class="node-title">
+                    <span class="icon">📊</span>
+                    <div>
+                        <div>4. 执行计划详细分析</div>
+                        <div class="node-title-en">Execution Plan Detailed Analysis</div>
+                    </div>
+                </div>
+                <div class="node-content">
+                    <strong>最终选定的执行方案参数：</strong><br>
+                    <em>Final execution plan parameters</em>
+                    
+                    <div class="metric-grid">
+                        <div class="metric-card">
+                            <div class="metric-label">访问类型 | Access Type</div>
+                            <div class="metric-value">RANGE</div>
+                            <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">范围扫描 Range Scan</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">索引长度 | Key Length</div>
+                            <div class="metric-value">87 字节</div>
+                            <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">2列索引 2 Columns</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">扫描行数 | Rows Scanned</div>
+                            <div class="metric-value">110,434</div>
+                            <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">1年分时数据 1-year data</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">过滤率 | Filtered</div>
+                            <div class="metric-value">100%</div>
+                            <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">无额外过滤 No extra filter</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">读取数据量 | Data Read</div>
+                            <div class="metric-value">16 MB</div>
+                            <div style="font-size: 11px; color: #7f8c8d; margin-top: 5px;">索引页大小 Index page size</div>
+                        </div>
+                        <div class="metric-card">
+                            <div class="metric-label">使用覆盖索引 | Using Index</div>
+                            <div class="metric-value">✅ TRUE</div>
+                            <div style="font-size: 11px; color: #27ae60; margin-top: 5px;">无需回表 No lookup</div>
+                        </div>
+                    </div>
+                    
+                    <div class="node-details" style="margin-top: 15px;">
+                        <strong>🔍 索引使用详情 | Index Usage Details:</strong><br>
+                        <strong>Used Key Parts 实际使用的索引列:</strong><br>
+                        1️⃣ <span class="highlight">wind_code</span> - 等值匹配 (Equality Match): <code>'000001.SH'</code><br>
+                        2️⃣ <span class="highlight">trade_date</span> - 范围扫描 (Range Scan): <code>BETWEEN '2024-10-01' AND '2025-10-02'</code><br>
+                        <br>
+                        <strong>符合最左前缀原则 Follows Leftmost Prefix Rule:</strong><br>
+                        • 先精确定位wind_code (First locate wind_code)<br>
+                        • 再在该段内进行日期范围扫描 (Then range scan within that segment)
+                    </div>
+                    
+                    <div class="node-details" style="margin-top: 15px;">
+                        <strong>💰 代价模型计算公式 | Cost Model Formula:</strong><br>
+                        <div style="background: #2c3e50; padding: 12px; border-radius: 6px; color: #ecf0f1; margin-top: 8px;">
+                            <strong>读取代价 Read Cost = 13,013.46</strong><br>
+                            <em style="font-size: 12px;">• I/O成本: 扫描索引范围页面的磁盘读取代价</em><br>
+                            <em style="font-size: 12px;">• I/O cost for reading index range pages</em><br>
+                            <br>
+                            <strong>评估代价 Eval Cost = 11,043.40</strong><br>
+                            <em style="font-size: 12px;">• CPU成本: 对110434行进行条件判断和数据处理</em><br>
+                            <em style="font-size: 12px;">• CPU cost for condition evaluation on 110,434 rows</em><br>
+                            <br>
+                            <strong style="color: #2ecc71;">总代价 Total Cost = 24,056.86</strong><br>
+                            <em style="font-size: 12px;">• 读取代价 + 评估代价 (Read + Eval)</em>
+                        </div>
+                    </div>
+                    
+                    <div class="node-details" style="margin-top: 15px;">
+                        <strong>📋 下推条件 | Pushed-Down Condition:</strong><br>
+                        <div class="code-block">
+attached_condition:<br>
+  (wind_code = '000001.SH') AND<br>
+  (trade_date BETWEEN '2024-10-01' AND '2025-10-02')
+                        </div>
+                        <span class="badge success">✓ 成功下推到存储引擎</span><br>
+                        <em style="font-size: 12px;">Successfully pushed down to storage engine</em><br>
+                        <em style="font-size: 12px;">无函数/表达式导致索引失效 (No function/expression causing index failure)</em>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- 5. 性能优化建议 -->
+            <div class="flow-node result">
+                <div class="node-title">
+                    <span class="icon">💡</span>
+                    <div>
+                        <div>5. 性能评估与优化建议</div>
+                        <div class="node-title-en">Performance Evaluation & Optimization Suggestions</div>
+                    </div>
+                </div>
+                <div class="node-content">
+                    <div class="node-details" style="background: #d5f4e6;">
+                        <strong>✅ 优秀表现 | Excellent Performance:</strong><br>
+                        • 使用覆盖索引，避免回表 (Using covering index, no table lookup)<br>
+                        • 索引列完美匹配查询条件 (Index columns perfectly match query conditions)<br>
+                        • 条件成功下推到存储引擎 (Conditions pushed to storage engine)<br>
+                        • 100%过滤率，无额外浪费 (100% filtering, no waste)
+                    </div>
+                    
+                    <div class="node-details" style="margin-top: 15px; background: #fff3cd;">
+                        <strong>⚠️ 注意事项 | Considerations:</strong><br>
+                        • 扫描11万行数据，查询1年分时行情属于正常范围<br>
+                        <em style="font-size: 12px;">110K rows for 1-year tick data is normal range</em><br>
+                        • 代价2.4万相对较高，但对于时间序列数据合理<br>
+                        <em style="font-size: 12px;">Cost 24K is relatively high but reasonable for time-series data</em><br>
+                        • 如果频繁查询，可考虑结果缓存<br>
+                        <em style="font-size: 12px;">Consider result caching for frequent queries</em>
+                    </div>
+                    
+                    <div class="node-details" style="margin-top: 15px; background: #ebf5fb;">
+                        <strong>🎯 进一步优化方向 | Further Optimization:</strong><br>
+                        1️⃣ <strong>时间范围优化 Time Range Optimization:</strong><br>
+                        • 缩短查询时间跨度可显著降低扫描行数<br>
+                        <em style="font-size: 12px;">Reducing time range significantly lowers rows scanned</em><br>
+                        <br>
+                        2️⃣ <strong>分区表 Partitioning:</strong><br>
+                        • 按月份/季度分区可以快速定位数据<br>
+                        <em style="font-size: 12px;">Monthly/quarterly partitioning for faster data location</em><br>
+                        <br>
+                        3️⃣ <strong>应用层优化 Application Layer:</strong><br>
+                        • 实现智能缓存策略<br>
+                        <em style="font-size: 12px;">Implement smart caching strategy</em><br>
+                        • 考虑增量更新机制<br>
+                        <em style="font-size: 12px;">Consider incremental update mechanism</em>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="arrow">↓</div>
+            
+            <!-- 6. 最终结论 -->
+            <div class="flow-node end">
+                <div class="node-title">
+                    <span class="icon">🎉</span>
+                    <div>
+                        <div>6. 优化器决策总结</div>
+                        <div class="node-title-en">Optimizer Decision Summary</div>
+                    </div>
+                </div>
+                <div class="node-content">
+                    <div style="text-align: center; padding: 20px; background: rgba(46, 204, 113, 0.1); border-radius: 10px;">
+                        <div style="font-size: 24px; color: #27ae60; margin-bottom: 10px;">
+                            <strong>✅ 最优执行方案已选定</strong><br>
+                            <em style="font-size: 16px;">Optimal Execution Plan Selected</em>
+                        </div>
+                        <div style="margin-top: 20px; font-size: 16px;">
+                            <strong>选定索引 Selected Index:</strong><br>
+                            <span class="highlight" style="font-size: 18px;">idx_windcode_tradedate_price</span>
+                        </div>
+                        <div style="margin-top: 15px;">
+                            <strong>访问方式 Access Method:</strong> RANGE 范围扫描<br>
+                            <strong>优化技术 Optimization:</strong> Covering Index 覆盖索引<br>
+                            <strong>总代价 Total Cost:</strong> 24,056.86<br>
+                            <strong>预估扫描 Estimated Scan:</strong> 110,434 rows / 16MB
+                        </div>
+                    </div>
+                    
+                    <div class="node-details" style="margin-top: 20px;">
+                        <strong>🏆 关键成功因素 | Key Success Factors:</strong><br>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-top: 10px;">
+                            <div style="padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #2ecc71;">
+                                <strong>1. 索引设计优秀</strong><br>
+                                <em style="font-size: 12px;">Excellent index design</em><br>
+                                覆盖所有查询列
+                            </div>
+                            <div style="padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #3498db;">
+                                <strong>2. 查询条件优化</strong><br>
+                                <em style="font-size: 12px;">Optimized query conditions</em><br>
+                                符合索引前缀顺序
+                            </div>
+                            <div style="padding: 15px; background: white; border-radius: 8px; border-left: 4px solid #9b59b6;">
+                                <strong>3. 避免回表操作</strong><br>
+                                <em style="font-size: 12px;">Avoid table lookup</em><br>
+                                显著降低I/O成本
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px; padding: 20px; background: #f8f9fa; border-radius: 10px; text-align: center;">
+            <p style="color: #7f8c8d; font-size: 14px;">
+                <strong>📝 说明 Note:</strong> 本流程图详细展示了MySQL

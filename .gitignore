@@ -1,0 +1,4 @@
+# 忽略含有敏感信息的文件
+tool/key/
+AI/OpenAI/
+Java基础/

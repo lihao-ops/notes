@@ -1,0 +1,2061 @@
+# 本地虚拟机集群环境搭建
+
+
+
+## 前置准备
+
+- CentOS-7-x86_64-DVD-2009.iso
+- jdk-17.0.12
+- VMware Workstation
+- 3台node
+
+
+
+
+
+
+
+### VM 建议设置（创建三台 node1/node2/node3）
+
+- Name: node1 / node2 / node3
+- Guest OS: Linux → CentOS 7 (64-bit)
+- CD/DVD: 挂载 CentOS-7-x86_64-DVD-2009.iso
+- CPU: 3 vCPU
+- Memory: 8 GB (8192 MB)
+- Network: NAT 或 Host-only / 自定义 VMnet（选用 Host-only/内部网络并为每台分配固定内网 IP）
+- Hard Disk: 25 GB (single virtual disk)
+- USB controller: optional
+- Other: Enable "Fit all virtual machine memory into reserved host RAM" if available to avoid overcommit (optional)
+
+
+
+
+
+### 虚拟机环境搭建
+
+
+
+#### 选择典型
+
+<img src="https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510041736178.png" alt="image-20251004173648120" style="zoom:50%;" />
+
+
+
+
+
+#### 选现在安装操作系统
+
+>使用指定镜像安装系统
+
+<img src="https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510041807696.png" alt="image-20251004180750602" style="zoom:50%;" />
+
+
+
+
+
+#### 配置
+
+>硬件
+
+<img src="https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510051850018.png" alt="image-20251005185051978" style="zoom:50%;" />
+
+
+
+>选项
+
+<img src="https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510051851237.png" alt="image-20251005185118194" style="zoom:50%;" />
+
+
+
+
+
+
+
+
+
+#### 取消进入图形化界面
+
+
+
+##### 1.先由图形化界面进入命令行界面
+
+>快捷键
+
+```bash
+Ctrl + Alt + F2
+```
+
+
+
+##### 2.查看当前状态
+
+>此为默认开机进入图形化界面状态
+
+```bash
+[root@localhost ~]# systemctl get-default 
+graphical.target
+```
+
+
+
+##### 3.更改状态为默认开机进入命令行状态
+
+>永久默认进入命令行
+
+```bash
+[root@localhost ~]# systemctl set-default multi-user.target 
+```
+
+>输出
+
+```bash
+Removed symlink /etc/systemd/system/default.target.
+Created symlink from /etc/systemd/system/default.target to /usr/lib/systemd/system/multi-user.target.
+```
+
+
+
+##### 4.测试
+
+>查看当前是否已更改为命令行状态`multi-user.target`
+
+```bash
+[root@localhost ~]# systemctl get-default 
+multi-user.target
+```
+
+说明：已更改成功
+
+
+
+>重启测试
+
+```bash
+[root@localhost ~]# reboot 
+```
+
+
+
+>测试成功
+
+已经默认开机进入命令行模式
+
+
+
+
+
+
+
+
+
+#### xshell连接
+
+>查看虚拟机中的ip
+
+```bash
+ip a
+```
+
+>使用下面的IP来连接吧，局域网的IP随着你更换wifi会出现更改，所以用最下面的整个`192.168.122.1`
+
+![image-20251005182127561](https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510051821682.png)
+
+
+
+```txt
+ssh://root:**********@192.168.122.1:22
+```
+
+
+
+
+
+
+
+#### 克隆
+
+
+
+##### 克隆当前`node1`为`node2`/`node3`
+
+![image-20251005194903759](https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510051949805.png)
+
+
+
+
+
+##### 解决克隆后IP一致问题
+
+
+
+如果你克隆了这台虚拟机，那么新的虚拟机会**复制同一个 MAC 地址和 DHCP 标识**。
+ → 所以 DHCP 服务器会认为这是同一台机器，分配相同的 IP。
+ → 导致你说的“IP 一样”现象。
+
+
+
+>先备份配置
+
+```ba
+cp -p /etc/sysconfig/network-scripts/ifcfg-ens33 /etc/sysconfig/network-scripts/ifcfg-ens33_back
+```
+
+
+
+###### ⚙️ 二、正确修复步骤（克隆后的机器执行）
+
+在克隆出来的每台 CentOS7 虚拟机上执行以下操作👇
+
+------
+
+###### ✅ 第一步：修改网卡配置文件
+
+编辑：
+
+```
+vi /etc/sysconfig/network-scripts/ifcfg-ens33
+```
+
+删除以下两行（如果存在）：
+
+```
+HWADDR=00:0c:29:33:0d:e4
+UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+查看后只有UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx这样的，已删除
+
+
+
+确认 `BOOTPROTO=dhcp` 存在：
+
+```
+BOOTPROTO=dhcp
+ONBOOT=yes
+```
+
+已确认存在
+
+保存退出。
+
+------
+
+###### ✅ 第二步：重新生成机器标识（关键）
+
+执行：
+
+```
+rm -f /etc/machine-id
+systemd-machine-id-setup
+```
+
+> 这一步会让系统拥有一个新的唯一机器 ID，避免和原虚拟机冲突。
+
+------
+
+###### ✅ 第三步：重启网络服务
+
+```
+systemctl restart network
+```
+
+或直接重启：
+
+```
+reboot
+```
+
+重启后再执行：
+
+```
+ip addr
+```
+
+你应该能看到 **新的 MAC 地址和不同的 IP 地址**。
+
+
+
+
+
+
+
+
+
+
+
+#### 配置集群网络环境
+
+##### 注意：如果是克隆的机器前提是要
+
+###### ✅ 第一步：修改网卡配置文件
+
+编辑：
+
+```
+vi /etc/sysconfig/network-scripts/ifcfg-ens33
+```
+
+删除以下两行（如果存在）：
+
+```
+HWADDR=00:0c:29:33:0d:e4
+UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+```
+
+查看后只有UUID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx这样的，已删除
+
+
+
+确认 `BOOTPROTO=dhcp` 存在：
+
+```
+BOOTPROTO=dhcp
+ONBOOT=yes
+```
+
+已确认存在
+
+保存退出。
+
+------
+
+###### ✅ 第二步：重新生成机器标识（关键）
+
+执行：
+
+```
+rm -f /etc/machine-id
+systemd-machine-id-setup
+```
+
+> 这一步会让系统拥有一个新的唯一机器 ID，避免和原虚拟机冲突。
+
+
+
+
+
+
+
+
+
+
+
+##### 每台虚拟机配置双网络适配器
+
+- Host-only 网卡本质是宿主机和虚拟机之间的一个独立网段（虚拟内网），不依赖外部物理网络。
+- 静态 IP 让每台虚拟机的地址固定，Xshell 不用每次查 IP。
+- NAT 网卡保留给虚拟机访问外网，Host-only 网卡负责 SSH 和集群通信。
+
+>这样不同的wifi下，也可以保持IP一致！
+
+
+
+###### 配置不同wifi下依然保持IP且xshell连接正常
+
+
+
+<img src="C:\Users\lihao\AppData\Roaming\Typora\typora-user-images\image-20251005203320133.png" alt="image-20251005203320133" style="zoom:50%;" />
+
+
+
+
+
+
+
+###### 桥接(IP随机33)
+
+<img src="https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510052138102.png" alt="image-20251005213828037" style="zoom:50%;" />
+
+
+
+###### 固定
+
+<img src="https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510071849621.png" alt="image-20251007184934547" style="zoom:50%;" />
+
+
+
+
+
+###### 查看windows本机IP情况
+
+```bash
+ipconfig
+```
+
+```bash
+以太网适配器 VMware Network Adapter VMnet1:
+
+   连接特定的 DNS 后缀 . . . . . . . :
+   描述. . . . . . . . . . . . . . . : VMware Virtual Ethernet Adapter for VMnet1
+   物理地址. . . . . . . . . . . . . : 00-50-56-C0-00-01
+   DHCP 已启用 . . . . . . . . . . . : 是
+   自动配置已启用. . . . . . . . . . : 是
+   本地链接 IPv6 地址. . . . . . . . : fe80::9fae:f90f:651d:dc48%9(首选)
+   IPv4 地址 . . . . . . . . . . . . : 192.168.254.1(首选)
+   子网掩码  . . . . . . . . . . . . : 255.255.255.0
+   获得租约的时间  . . . . . . . . . : 2025年10月7日 17:46:21
+   租约过期的时间  . . . . . . . . . : 2025年10月7日 18:38:38
+   默认网关. . . . . . . . . . . . . :
+   DHCP 服务器 . . . . . . . . . . . : 192.168.254.254
+   DHCPv6 IAID . . . . . . . . . . . : 587223126
+   DHCPv6 客户端 DUID  . . . . . . . : 00-01-00-01-2F-A8-7A-43-B0-25-AA-82-80-57
+   TCPIP 上的 NetBIOS  . . . . . . . : 已启用
+```
+
+也就是说将每台node,的ens36改成对应的IP改成`192.168.254.*`网段
+
+
+
+
+
+
+
+###### 识别网卡名
+
+```bash
+[root@node3 ~]# ip a
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+    inet6 ::1/128 scope host 
+       valid_lft forever preferred_lft forever
+2: ens33: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 00:0c:29:c8:0f:b0 brd ff:ff:ff:ff:ff:ff
+    inet 192.168.168.195/24 brd 192.168.168.255 scope global noprefixroute dynamic ens33
+       valid_lft 1103sec preferred_lft 1103sec
+    inet6 2408:840d:3a00:2cfe:cf03:7e17:f65:a2b7/64 scope global noprefixroute 
+       valid_lft forever preferred_lft forever
+    inet6 2408:840d:3400:857:284d:5cd1:34ca:106b/64 scope global noprefixroute 
+       valid_lft forever preferred_lft forever
+    inet6 fe80::c33d:734d:99d7:b1f/64 scope link noprefixroute 
+       valid_lft forever preferred_lft forever
+3: ens36: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc pfifo_fast state UP group default qlen 1000
+    link/ether 00:0c:29:c8:0f:ba brd ff:ff:ff:ff:ff:ff
+    inet 192.168.56.103/24 brd 192.168.56.255 scope global noprefixroute ens36
+       valid_lft forever preferred_lft forever
+    inet6 fe80::20c:29ff:fec8:fba/64 scope link 
+       valid_lft forever preferred_lft forever
+4: virbr0: <NO-CARRIER,BROADCAST,MULTICAST,UP> mtu 1500 qdisc noqueue state DOWN group default qlen 1000
+    link/ether 52:54:00:23:87:ad brd ff:ff:ff:ff:ff:ff
+    inet 192.168.122.1/24 brd 192.168.122.255 scope global virbr0
+       valid_lft forever preferred_lft forever
+5: virbr0-nic: <BROADCAST,MULTICAST> mtu 1500 qdisc pfifo_fast master virbr0 state DOWN group default qlen 1000
+    link/ether 52:54:00:23:87:ad brd ff:ff:ff:ff:ff:ff
+```
+
+说明：ens33是桥接，ens36是固定！
+
+
+
+
+
+##### 新增ens36配置(不同nodeIP后缀数字不一样)
+
+>为了避免 DHCP 改动 IP，建议直接配置静态 IP
+
+```bash
+vim /etc/sysconfig/network-scripts/ifcfg-ens36
+```
+
+
+
+>新增如下内容
+
+```bash
+TYPE=Ethernet
+BOOTPROTO=static
+NAME=ens36
+DEVICE=ens36
+ONBOOT=yes
+IPADDR=192.168.56.103
+NETMASK=255.255.255.0
+```
+
+注：IPADDR=192.168.56.103其实是node3，那么node2则是IPADDR=192.168.56.102，依次类推
+
+
+
+
+
+
+
+###### node1
+
+```bash
+TYPE=Ethernet
+BOOTPROTO=static
+NAME=ens36
+DEVICE=ens36
+ONBOOT=yes
+IPADDR=192.168.254.2
+NETMASK=255.255.255.0
+```
+
+
+
+###### node2
+
+```bash
+TYPE=Ethernet
+BOOTPROTO=static
+NAME=ens36
+DEVICE=ens36
+ONBOOT=yes
+IPADDR=192.168.254.3
+NETMASK=255.255.255.0
+```
+
+
+
+
+
+###### node3
+
+```bash
+TYPE=Ethernet
+BOOTPROTO=static
+NAME=ens36
+DEVICE=ens36
+ONBOOT=yes
+IPADDR=192.168.254.4
+NETMASK=255.255.255.0
+```
+
+
+
+
+
+
+
+
+
+##### 配置互联IP
+
+>在每台node上均执行
+
+```java
+cat > /etc/hosts <<EOF
+127.0.0.1   localhost
+192.168.254.2 node1
+192.168.254.3 node2
+192.168.254.4 node3
+EOF
+```
+
+
+
+
+
+保存后：
+
+```
+systemctl restart network
+```
+
+
+
+
+
+##### 验证
+
+###### 验证不同wifi下是否用xshell输入固定IP还是能连接
+
+测试成功
+
+
+
+###### 验证其它node互联
+
+```bash
+ping node1
+ping node2
+ping node3
+```
+
+
+
+```bash
+[root@node1 ~]# ping node1
+PING node1 (192.168.56.101) 56(84) bytes of data.
+64 bytes from node1 (192.168.56.101): icmp_seq=1 ttl=64 time=0.040 ms
+pin64 bytes from node1 (192.168.56.101): icmp_seq=2 ttl=64 time=0.058 ms
+g^H^C
+--- node1 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 999ms
+rtt min/avg/max/mdev = 0.040/0.049/0.058/0.009 ms
+[root@node1 ~]# ping node2
+PING node2 (192.168.56.102) 56(84) bytes of data.
+64 bytes from node2 (192.168.56.102): icmp_seq=1 ttl=64 time=0.564 ms
+64 bytes from node2 (192.168.56.102): icmp_seq=2 ttl=64 time=1.35 ms
+^C
+--- node2 ping statistics ---
+2 packets transmitted, 2 received, 0% packet loss, time 1000ms
+rtt min/avg/max/mdev = 0.564/0.961/1.358/0.397 ms
+[root@node1 ~]# ping node3
+PING node3 (192.168.56.103) 56(84) bytes of data.
+64 bytes from node3 (192.168.56.103): icmp_seq=1 ttl=64 time=0.600 ms
+64 bytes from node3 (192.168.56.103): icmp_seq=2 ttl=64 time=1.37 ms
+```
+
+
+
+
+
+###### 验证成功标志
+
+在每个节点上执行：
+
+```
+hostname -I
+```
+
+如果三台虚拟机分别返回对应IP
+
+说明 IP 不冲突，可以搭 Kafka 集群了。
+
+
+
+
+
+##### 遇到的问题
+
+
+
+###### 线上环境：多台 VM 的 ens36 网络问题总结
+
+> 问题概要
+
+\- 目标：三台 VM 的接口 ens36 分别在宿主机的 Host‑only 网段 192.168.254.0/24 上，宿主机的 VMnet 地址为 192.168.254.1，三台 VM 的期望地址为 192.168.254.2/3/4。
+
+\- 实际情况：在 node2 上通过 `ip -br addr` 查看到 ens36 的地址是 192.168.56.102/24，而宿主机的 virbr0 接口显示 192.168.122.1 的地址（libvirt 的默认桥接网段），与期望的 192.168.254.0/24 网段无关。
+
+\- 结论：问题并非仅仅是本地的 ifcfg 文件未被应用，而是网络拓扑被绑定到错误的虚拟网段（192.168.56.0/24），以及/或 NetworkManager 使用了不同的连接配置覆盖了静态配置。
+
+> 原因分析
+
+\- ens36 实际连接到了错误的虚拟网段（192.168.56.0/24），而不是宿主机的 Host‑only 网段 192.168.254.0/24。
+
+\- virbr0（192.168.122.1）是 libvirt 的默认桥，和当前问题的接口 ens36 无直接关系，但容易造成混淆。
+
+\- 即使编辑了 /etc/sysconfig/network-scripts/ifcfg-ens36，NetworkManager 仍可能通过现有的连接使用 DHCP/其他自动配置覆盖静态配置。
+
+\- 需要：确认宿主机 VMnet 配置、确保 VM 内 ens36 绑定到正确的 VMnet/网段、以及通过适当的方式（nmcli 或 ifcfg）设置静态 IP，并确保该连接被激活。
+
+> 解决思路与步骤（已完成）
+
+\1. 验证当前网络状态
+
+   \- 使用 ip 命令确认实际分配的 IP、接口及网段。
+
+   \- 使用 nmcli 查看 NetworkManager 的设备和连接信息，找出 ens36 对应的连接名。
+
+\2. 宿主机层面确认
+
+   \- 在宿主机 VMware 的 Virtual Network Editor 中：
+
+​     \- 将 Host‑only 网段设为 192.168.254.0/24，宿主机地址为 192.168.254.1。
+
+​     \- 关闭或限制 DHCP 范围，避免覆盖 192.168.254.2–4。
+
+\3. VM 侧的网卡绑定
+
+   \- 将 ens36 绑定到新的 Host‑only VMnet（如 Custom: VMnet1）。
+
+   \- 确认 ens36 的 MAC 与 VM 设置中的网卡匹配，确保物理层逻辑绑定一致。
+
+\4. 使用 NetworkManager 设置静态 IP
+
+   \- 列出连接并找到 ens36 的连接名：
+
+​     \- nmcli device status
+
+​     \- nmcli connection show
+
+   \- 修改为静态地址（以 node2 为例：192.168.254.3/24）并激活：
+
+​     \- nmcli connection modify "<连接名_for_ens36>" ipv4.method manual ipv4.addresses 192.168.254.3/24
+
+​     \- nmcli connection up "<连接名_for_ens36>"
+
+   \- 也可以新建一个独立的静态连接并启用，以确保不会被 DHCP 覆盖。
+
+\5. 验证与自检
+
+   \- 在 VM 内执行 ip -br addr，确认 ens36 显示 192.168.254.x/24。
+
+   \- 与宿主机及其他节点互相连通（ping 测试）。
+
+   \- 如有旧连接持续覆盖静态配置，禁用或删除原有 DHCP/自动连接。
+
+\6. 处理常见卡点
+
+   \- 如果 ens36 仍显示 192.168.56.x，说明仍绑定到错误 VMnet，回到步骤 2 重新绑定到正确 VMnet。
+
+   \- virbr0 的 192.168.122.1 可以忽略，若不需要 libvirt 网络，可考虑禁用/销毁默认网络。
+
+> 最终状态
+
+\- 三台 VM 的 ens36 已绑定到宿主机的 Host‑only 网段 192.168.254.0/24。
+
+\- 三台 VM 的 IP 地址分配如：192.168.254.2、192.168.254.3、192.168.254.4（按需分配）。
+
+\- 确认完成后，三台 VM 之间可互相 Ping，相邻宿主机也可 Ping 通。
+
+> 参考命令清单
+
+\- 查看简要接口与地址
+
+  \- ip -br addr
+
+  \- ip addr show ens36
+
+\- 查看 NetworkManager 状态
+
+  \- nmcli device status
+
+  \- nmcli connection show
+
+  \- nmcli connection up "<连接名>"
+
+  \- nmcli connection modify "<连接名>" ipv4.method manual ipv4.addresses 192.168.254.x/24
+
+\- 查看/修改 ifcfg 配置（若仍使用）
+
+  \- cat /etc/sysconfig/network-scripts/ifcfg-ens36
+
+  \- systemctl restart NetworkManager
+
+\- VMware 网路配置（宿主机）
+
+  \- VMware Virtual Network Editor → VMnet1 → 设置为 192.168.254.0/24（Host‑only）
+
+
+
+
+
+
+
+
+
+### 设置时间
+
+>中国上海时区
+
+```bash
+[root@node1 ~]# sudo timedatectl set-timezone Asia/Shanghai
+[root@node1 ~]# sudo timedatectl set-ntp true
+[root@node1 ~]# timedatectl
+```
+
+```bash
+      Local time: Tue 2025-10-07 21:10:12 CST
+  Universal time: Tue 2025-10-07 13:10:12 UTC
+        RTC time: Tue 2025-10-07 13:10:12
+       Time zone: Asia/Shanghai (CST, +0800)
+     NTP enabled: yes
+NTP synchronized: yes
+ RTC in local TZ: no
+      DST active: n/a
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+## JDK17
+
+https://blog.csdn.net/LMS2022223000/article/details/149581584
+
+
+
+### 1.先删除旧版本java
+
+>执行java -version看看有没有已经安装的旧版本的java
+
+```bash
+java -version
+```
+
+
+
+>有旧版本java,应该是yum安装的，那么就用yum的命令来卸载
+
+一般默认在`/usr/lib/jvm`目录下看有哪些版本的java
+
+
+
+>使用yum来删除，例如如下命令
+
+```bash
+yum remove -y java-1.7.0-openjdk*
+```
+
+直到全部删除完毕后，执行`java`命令发现并没有了
+
+![image-20251005182328736](https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510051823776.png)
+
+
+
+### 2.将指定版本的安装包解压到相应目录下
+
+>解压到/hli/software/jdk17/目录下
+
+```bash
+tar -xzvf jdk-17.0.15_linux-x64_bin.tar.gz -C /hli/software/jdk17/
+```
+
+
+
+>将文件夹下的内容移动到指定./jdk目录下,并删除旧目录
+
+```bash
+mv /hli/software/jdk17/jdk-17.0.15/* /hli/software/jdk17/
+```
+
+
+
+```bash
+rm -rf /hli/software/jdk17/jdk-17.0.15/
+```
+
+
+
+### 3.配置环境遍历
+
+>修改`vim /etc/profile`内容，以新增指定目录JDK版本环境变量
+
+```bash
+export JAVA_HOME=/hli/software/jdk17
+export CLASSPATH=.:JAVA_HOME/jre/lib/rt.jar:$JAVA_HOME/lib/dt.jar:$JAVA_HOME/lib/tools.jar
+export PATH=$JAVA_HOME/bin:$PATH
+```
+
+
+
+>要在某个`fi`下才行
+
+![image-20251005183626841](https://notes-1307435281.cos.ap-shanghai.myqcloud.com/note/master/202510051836898.png)
+
+
+
+### 4.重新加载新配置
+
+>重新加载使其生效
+
+```bash
+source /etc/profile
+```
+
+
+
+
+
+### 5.成功
+
+>已生效
+
+```bash
+[root@localhost jdk17]# java -version
+```
+
+
+
+```bash
+java version "17.0.15" 2025-04-15 LTS
+Java(TM) SE Runtime Environment (build 17.0.15+9-LTS-241)
+Java HotSpot(TM) 64-Bit Server VM (build 17.0.15+9-LTS-241, mixed mode, sharing)
+[root@localhost jdk17]# 
+```
+
+
+
+
+
+## Kafka4.0.0(无zookeper)集群
+
+
+
+### 1.解压缩kafka_2.13-4.0.0.tgz
+
+>解压缩到指定的目录`/hli/software/kafka4/`下
+
+```bash
+tar -zxvf /hli/package/kafka_2.13-4.0.0.tgz -C /hli/software/kafka4/
+```
+
+
+
+>移动到上一级目录
+
+```bash
+mv /hli/software/kafka4/kafka_2.13-4.0.0/* /hli/software/kafka4/
+```
+
+
+
+>删除内嵌包
+
+```bash
+rm -rf /hli/software/kafka4/kafka_2.13-4.0.0/
+```
+
+
+
+
+
+### 2.修改server.properties
+
+
+
+#### 完整配置文件
+
+```java
+############################# 服务器基础配置 #############################
+
+# 此服务器的角色。设置此项表示运行在 KRaft 模式
+process.roles=broker,controller
+
+# 此节点的唯一 ID（每个节点必须不同）
+node.id=1
+
+# 控制器集群的引导地址，用于连接控制器集群
+controller.quorum.bootstrap.servers=localhost:9093
+
+############################# Socket 服务器设置 #############################
+
+# Socket 服务器监听的地址
+# 当节点同时承担 broker 和 controller 时，必须至少列出 controller listener
+# 如果未定义 broker listener，默认会使用 java.net.InetAddress.getCanonicalHostName() 作为主机名，
+# 使用 PLAINTEXT 协议，端口为 9092。
+# 格式：
+#   listeners = listener_name://host_name:port
+# 示例：
+#   listeners = PLAINTEXT://your.host.name:9092
+listeners=PLAINTEXT://:9092,CONTROLLER://:9093
+
+# 用于 broker 之间通信的 listener 名称
+inter.broker.listener.name=PLAINTEXT
+
+# broker 或 controller 向客户端宣传的 listener 名称、主机名和端口
+# 如果未设置，则使用 "listeners" 的值
+advertised.listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+
+# controller 使用的 listener 名称列表
+# 在 KRaft 模式下必须配置
+controller.listener.names=CONTROLLER
+
+# 将 listener 名称映射为安全协议，默认名称与协议相同
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,SSL:SSL,SASL_PLAINTEXT:SASL_PLAINTEXT,SASL_SSL:SASL_SSL
+
+# 网络线程数：用于接收网络请求并发送响应
+num.network.threads=3
+
+# I/O 线程数：用于处理请求，可能包括磁盘 I/O
+num.io.threads=8
+
+# Socket 发送缓冲区大小（单位：字节）
+socket.send.buffer.bytes=102400
+
+# Socket 接收缓冲区大小（单位：字节）
+socket.receive.buffer.bytes=102400
+
+# Socket 可接受的最大请求大小（防止 OOM）
+socket.request.max.bytes=104857600
+
+############################# 日志基础配置 #############################
+
+# Kafka 日志存储目录，可以配置多个，使用逗号分隔
+log.dirs=/tmp/kraft-combined-logs
+
+# 默认 topic 分区数
+num.partitions=1
+
+# 每个数据目录用于日志恢复和关闭时刷新的线程数
+num.recovery.threads.per.data.dir=1
+
+############################# 内部主题设置 #############################
+
+# __consumer_offsets、__share_group_state 和 __transaction_state 内部主题的副本因子
+# 除非是开发测试环境，否则建议副本因子 > 1 保证可用性
+offsets.topic.replication.factor=1
+share.coordinator.state.topic.replication.factor=1
+share.coordinator.state.topic.min.isr=1
+transaction.state.log.replication.factor=1
+transaction.state.log.min.isr=1
+
+############################# 日志刷新策略 #############################
+
+# 消息会立即写入文件系统，但默认情况下 fsync() 是懒同步的。
+# 以下配置控制数据刷写到磁盘的策略。
+# 主要权衡：
+#    1. 持久性：未刷新的数据在没有复制的情况下可能丢失。
+#    2. 延迟：刷写间隔过大时会导致延迟峰值。
+#    3. 吞吐量：刷写通常最耗资源，频繁刷写会导致过多的磁盘寻道。
+# 可以全局设置或按 topic 单独覆盖。
+
+# 在强制刷写数据到磁盘之前允许的消息数量
+#log.flush.interval.messages=10000
+
+# 在强制刷写数据之前消息可以在日志中停留的最长时间（毫秒）
+#log.flush.interval.ms=1000
+
+############################# 日志保留策略 #############################
+
+# 以下配置控制日志段的删除策略。
+# 可以按时间或日志大小删除段文件，满足任一条件即删除。
+# 删除总是从日志末尾开始。
+
+# 日志文件达到该年龄后可被删除（单位：小时），168 小时 = 7 天
+log.retention.hours=168
+
+# 基于大小的日志保留策略，日志段将被删除，除非剩余的日志低于 log.retention.bytes。
+# 与 log.retention.hours 独立生效。
+#log.retention.bytes=1073741824
+
+# 日志段的最大大小，达到该大小时会生成新的日志段
+log.segment.bytes=1073741824
+
+# 检查是否可删除日志段的时间间隔（毫秒）
+log.retention.check.interval.ms=300000
+```
+
+
+
+
+
+
+
+
+
+
+
+#### 修改前先备份，养成好习惯
+
+```bash
+cp -p /hli/software/kafka4/config/server.properties /hli/software/kafka4/config/server.properties_back
+```
+
+
+
+#### 修改配置文件
+
+```bash
+vim /hli/software/kafka4/config/server.properties
+```
+
+
+
+#### 修改内容
+
+
+
+##### nodeid
+
+>主节点,这里是node1中的配置、如果是node2则是2依次类推
+
+```bash
+node.id=1
+```
+
+
+
+##### broker对外暴露的IP和端口
+
+```bash
+#broker对外暴露的IP和端口
+advertised.listeners=PLAINTEXT://localhost:9092,CONTROLLER://localhost:9093
+```
+
+
+
+##### 路径（节点间必须不一样）
+
+```bash
+log.dirs=/hli/software/kafka4/datas
+```
+
+
+
+##### node1
+
+```bash
+############################# 基础设置 #############################
+
+# 统一 node1 生成 UUID（KRaft 模式可留在文件中或在 format 时使用 -t 指定）
+cluster.id=n8vjTMpNSPWbUOrWJNnHJg
+
+# Kafka 节点角色，KRaft 模式必须设置
+process.roles=broker,controller
+
+# 节点唯一 ID，每个节点必须唯一
+node.id=1
+
+# KRaft Controller quorum 投票者（所有节点必须一致，使用 id@host:port）
+controller.quorum.voters=1@192.168.254.2:9093,2@192.168.254.3:9093,3@192.168.254.4:9093
+
+# 【删除此行】controller.quorum.bootstrap.servers 不是标准配置项，Kafka 4.0 不需要
+# controller.quorum.bootstrap.servers=CONTROLLER://192.168.1.101:9093,CONTROLLER://192.168.1.102:9093,CONTROLLER://192.168.1.103:9093
+
+############################# Listener 配置 #############################
+
+# Kafka Broker 和 Controller 的监听地址（本机地址）
+listeners=PLAINTEXT://192.168.254.2:9092,CONTROLLER://192.168.254.2:9093
+
+# Broker 之间通信使用的 listener
+inter.broker.listener.name=PLAINTEXT
+
+# 【修改】advertised.listeners 不应包含 CONTROLLER，只给客户端和 Broker 间通信用
+advertised.listeners=PLAINTEXT://192.168.254.2:9092
+
+# Controller listener 名称
+controller.listener.names=CONTROLLER
+
+# Listener 与安全协议映射
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+
+############################# 网络设置 #############################
+
+# 用于接收请求的网络线程数
+num.network.threads=3
+
+# 用于处理请求的线程数，包括磁盘 IO
+num.io.threads=8
+
+# 发送缓冲区大小
+socket.send.buffer.bytes=102400
+
+# 接收缓冲区大小
+socket.receive.buffer.bytes=102400
+
+# 最大请求大小（字节），用于防止 OOM
+socket.request.max.bytes=104857600
+
+############################# 日志存储 #############################
+
+# 日志存储目录（每个节点不同目录）
+log.dirs=/hli/software/kafka4/datas/kafka-logs-node1
+
+# 每个 Topic 默认分区数
+num.partitions=1
+
+# 启动恢复时每个日志目录使用的线程数
+num.recovery.threads.per.data.dir=1
+
+############################# 内部主题配置 #############################
+
+# offsets 内部主题副本因子，生产环境建议 >= 节点数
+offsets.topic.replication.factor=3
+
+# 【删除以下两行】share.coordinator 是实验性功能，4.0 正式版通常不需要
+# share.coordinator.state.topic.replication.factor=3
+# share.coordinator.state.topic.min.isr=2
+
+# 事务状态主题副本因子
+transaction.state.log.replication.factor=3
+transaction.state.log.min.isr=2
+
+############################# 日志刷新策略 #############################
+
+# 消息刷盘策略（可根据需求调整）
+#log.flush.interval.messages=10000
+#log.flush.interval.ms=1000
+
+############################# 日志保留策略 #############################
+
+# 日志保留时间（小时）
+log.retention.hours=168
+
+# 单个日志分段文件最大大小
+log.segment.bytes=1073741824
+
+# 日志检查删除间隔
+log.retention.check.interval.ms=300000
+
+# 日志保留总大小限制（可选配置）
+#log.retention.bytes=10737418240
+
+############################# 其它 #############################
+
+# 自动创建 topic
+auto.create.topics.enable=true
+
+# 是否允许 broker 删除 topic
+delete.topic.enable=true
+
+# 【删除此行】log4j 配置应在 log4j.properties 中管理，不属于 server.properties
+# log4j.rootLogger=INFO, stdout
+```
+
+
+
+
+
+
+
+
+
+
+
+##### node2
+
+```bash
+############################# 基础设置 #############################
+
+# Kafka 集群的全局唯一 ID（所有节点必须使用相同的 cluster.id）
+# 这个 UUID 是在 node1 上生成的，三个节点必须保持一致
+cluster.id=n8vjTMpNSPWbUOrWJNnHJg
+
+# Kafka 节点角色，KRaft 模式必须设置
+# broker: 处理客户端请求和数据存储
+# controller: 负责集群元数据管理（替代 ZooKeeper）
+process.roles=broker,controller
+
+# 节点唯一 ID，集群中每个节点必须唯一
+# node1=1, node2=2, node3=3
+node.id=2
+
+# KRaft Controller 仲裁投票者配置
+# 格式：node_id@host:controller_port
+# 所有节点的此配置必须完全一致，用于 Controller 选举和元数据同步
+controller.quorum.voters=1@192.168.254.2:9093,2@192.168.254.3:9093,3@192.168.254.4:9093
+
+############################# Listener 配置 #############################
+
+# Kafka 的监听地址配置
+# PLAINTEXT://ip:port - Broker 监听地址，用于客户端连接和 Broker 间通信
+# CONTROLLER://ip:port - Controller 监听地址，用于 Controller 仲裁通信
+# 注意：这里使用本机 IP 192.168.254.3
+listeners=PLAINTEXT://192.168.254.3:9092,CONTROLLER://192.168.254.3:9093
+
+# Broker 之间通信使用的 listener 名称
+# 与 listeners 中的 PLAINTEXT 对应
+inter.broker.listener.name=PLAINTEXT
+
+# 广播给客户端的地址（客户端实际连接的地址）
+# 只包含 PLAINTEXT，不包含 CONTROLLER（Controller 不对外暴露）
+advertised.listeners=PLAINTEXT://192.168.254.3:9092
+
+# Controller 使用的 listener 名称
+# 与 listeners 中的 CONTROLLER 对应
+controller.listener.names=CONTROLLER
+
+# Listener 名称与安全协议的映射关系
+# CONTROLLER 和 PLAINTEXT 都使用明文通信（生产环境建议使用 SSL）
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+
+############################# 网络设置 #############################
+
+# 网络处理线程数
+# 用于接收客户端请求和发送响应，建议设置为 CPU 核心数
+num.network.threads=3
+
+# IO 处理线程数
+# 用于处理请求逻辑，包括磁盘读写，建议设置为 CPU 核心数的 2 倍
+num.io.threads=8
+
+# Socket 发送缓冲区大小（字节）
+# 影响网络吞吐量，默认 100KB
+socket.send.buffer.bytes=102400
+
+# Socket 接收缓冲区大小（字节）
+# 影响网络吞吐量，默认 100KB
+socket.receive.buffer.bytes=102400
+
+# 单个请求的最大字节数（100MB）
+# 用于防止内存溢出（OOM），需要根据消息大小调整
+socket.request.max.bytes=104857600
+
+############################# 日志存储 #############################
+
+# Kafka 数据存储目录（日志分段文件存储位置）
+# 每个节点使用不同的目录，避免数据冲突
+# node1: kafka-logs-node1, node2: kafka-logs-node2, node3: kafka-logs-node3
+log.dirs=/hli/software/kafka4/datas/kafka-logs-node2
+
+# 新创建 Topic 时的默认分区数
+# 分区数越多，并行度越高，但也会增加资源消耗
+num.partitions=1
+
+# 启动时日志恢复和关闭时刷盘使用的线程数（每个数据目录）
+# 如果使用 RAID 阵列，建议增加此值
+num.recovery.threads.per.data.dir=1
+
+############################# 内部主题配置 #############################
+
+# __consumer_offsets 主题的副本因子
+# 用于存储消费者组的位移信息，建议设置为集群节点数（3）
+offsets.topic.replication.factor=3
+
+# __transaction_state 主题的副本因子
+# 用于存储事务状态信息，建议设置为集群节点数（3）
+transaction.state.log.replication.factor=3
+
+# __transaction_state 主题的最小同步副本数
+# 至少需要 2 个副本同步成功才认为写入成功，保证数据可靠性
+transaction.state.log.min.isr=2
+
+############################# 日志刷新策略 #############################
+
+# Kafka 默认异步刷盘（写入操作系统缓存），以下配置可强制同步刷盘
+# 注意：同步刷盘会显著降低性能，建议依赖副本机制保证数据可靠性
+
+# 每接收多少条消息强制刷盘一次（注释表示不启用）
+#log.flush.interval.messages=10000
+
+# 每隔多少毫秒强制刷盘一次（注释表示不启用）
+#log.flush.interval.ms=1000
+
+############################# 日志保留策略 #############################
+
+# 日志保留时间（小时）
+# 超过此时间的日志分段文件将被删除，默认 7 天（168 小时）
+log.retention.hours=168
+
+# 单个日志分段文件的最大大小（1GB）
+# 达到此大小后将创建新的日志分段文件
+log.segment.bytes=1073741824
+
+# 日志清理检查间隔（毫秒）
+# 每隔 5 分钟检查一次是否有日志需要删除
+log.retention.check.interval.ms=300000
+
+# 日志保留的最大总大小（字节），可选配置
+# 超过此大小后，最旧的日志分段将被删除
+# 注释表示不限制总大小，只根据时间删除
+#log.retention.bytes=10737418240
+
+############################# 其它配置 #############################
+
+# 是否允许自动创建 Topic
+# true: 生产者或消费者访问不存在的 Topic 时自动创建
+# false: 必须手动创建 Topic（生产环境建议设置为 false）
+auto.create.topics.enable=true
+
+# 是否允许删除 Topic
+# true: 可以通过命令删除 Topic
+# false: 删除命令无效（Kafka 4.0 默认为 true）
+delete.topic.enable=true
+```
+
+
+
+
+
+##### node3
+
+```bash
+############################# 基础设置 #############################
+
+# Kafka 集群的全局唯一 ID（所有节点必须使用相同的 cluster.id）
+# 这个 UUID 是在 node1 上生成的，三个节点必须保持一致
+cluster.id=n8vjTMpNSPWbUOrWJNnHJg
+
+# Kafka 节点角色，KRaft 模式必须设置
+# broker: 处理客户端请求和数据存储
+# controller: 负责集群元数据管理（替代 ZooKeeper）
+process.roles=broker,controller
+
+# 节点唯一 ID，集群中每个节点必须唯一
+# node1=1, node2=2, node3=3
+node.id=3
+
+# KRaft Controller 仲裁投票者配置
+# 格式：node_id@host:controller_port
+# 所有节点的此配置必须完全一致，用于 Controller 选举和元数据同步
+controller.quorum.voters=1@192.168.254.2:9093,2@192.168.254.3:9093,3@192.168.254.4:9093
+
+############################# Listener 配置 #############################
+
+# Kafka 的监听地址配置
+# PLAINTEXT://ip:port - Broker 监听地址，用于客户端连接和 Broker 间通信
+# CONTROLLER://ip:port - Controller 监听地址，用于 Controller 仲裁通信
+# 注意：这里使用本机 IP 192.168.56.103
+listeners=PLAINTEXT://192.168.254.4:9092,CONTROLLER://192.168.254.4:9093
+
+# Broker 之间通信使用的 listener 名称
+# 与 listeners 中的 PLAINTEXT 对应
+inter.broker.listener.name=PLAINTEXT
+
+# 广播给客户端的地址（客户端实际连接的地址）
+# 只包含 PLAINTEXT，不包含 CONTROLLER（Controller 不对外暴露）
+advertised.listeners=PLAINTEXT://192.168.254.4:9092
+
+# Controller 使用的 listener 名称
+# 与 listeners 中的 CONTROLLER 对应
+controller.listener.names=CONTROLLER
+
+# Listener 名称与安全协议的映射关系
+# CONTROLLER 和 PLAINTEXT 都使用明文通信（生产环境建议使用 SSL）
+listener.security.protocol.map=CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+
+############################# 网络设置 #############################
+
+# 网络处理线程数
+# 用于接收客户端请求和发送响应，建议设置为 CPU 核心数
+num.network.threads=3
+
+# IO 处理线程数
+# 用于处理请求逻辑，包括磁盘读写，建议设置为 CPU 核心数的 2 倍
+num.io.threads=8
+
+# Socket 发送缓冲区大小（字节）
+# 影响网络吞吐量，默认 100KB
+socket.send.buffer.bytes=102400
+
+# Socket 接收缓冲区大小（字节）
+# 影响网络吞吐量，默认 100KB
+socket.receive.buffer.bytes=102400
+
+# 单个请求的最大字节数（100MB）
+# 用于防止内存溢出（OOM），需要根据消息大小调整
+socket.request.max.bytes=104857600
+
+############################# 日志存储 #############################
+
+# Kafka 数据存储目录（日志分段文件存储位置）
+# 每个节点使用不同的目录，避免数据冲突
+# node1: kafka-logs-node1, node2: kafka-logs-node2, node3: kafka-logs-node3
+log.dirs=/hli/software/kafka4/datas/kafka-logs-node3
+
+# 新创建 Topic 时的默认分区数
+# 分区数越多，并行度越高，但也会增加资源消耗
+num.partitions=1
+
+# 启动时日志恢复和关闭时刷盘使用的线程数（每个数据目录）
+# 如果使用 RAID 阵列，建议增加此值
+num.recovery.threads.per.data.dir=1
+
+############################# 内部主题配置 #############################
+
+# __consumer_offsets 主题的副本因子
+# 用于存储消费者组的位移信息，建议设置为集群节点数（3）
+offsets.topic.replication.factor=3
+
+# __transaction_state 主题的副本因子
+# 用于存储事务状态信息，建议设置为集群节点数（3）
+transaction.state.log.replication.factor=3
+
+# __transaction_state 主题的最小同步副本数
+# 至少需要 2 个副本同步成功才认为写入成功，保证数据可靠性
+transaction.state.log.min.isr=2
+
+############################# 日志刷新策略 #############################
+
+# Kafka 默认异步刷盘（写入操作系统缓存），以下配置可强制同步刷盘
+# 注意：同步刷盘会显著降低性能，建议依赖副本机制保证数据可靠性
+
+# 每接收多少条消息强制刷盘一次（注释表示不启用）
+#log.flush.interval.messages=10000
+
+# 每隔多少毫秒强制刷盘一次（注释表示不启用）
+#log.flush.interval.ms=1000
+
+############################# 日志保留策略 #############################
+
+# 日志保留时间（小时）
+# 超过此时间的日志分段文件将被删除，默认 7 天（168 小时）
+log.retention.hours=168
+
+# 单个日志分段文件的最大大小（1GB）
+# 达到此大小后将创建新的日志分段文件
+log.segment.bytes=1073741824
+
+# 日志清理检查间隔（毫秒）
+# 每隔 5 分钟检查一次是否有日志需要删除
+log.retention.check.interval.ms=300000
+
+# 日志保留的最大总大小（字节），可选配置
+# 超过此大小后，最旧的日志分段将被删除
+# 注释表示不限制总大小，只根据时间删除
+#log.retention.bytes=10737418240
+
+############################# 其它配置 #############################
+
+# 是否允许自动创建 Topic
+# true: 生产者或消费者访问不存在的 Topic 时自动创建
+# false: 必须手动创建 Topic（生产环境建议设置为 false）
+auto.create.topics.enable=true
+
+# 是否允许删除 Topic
+# true: 可以通过命令删除 Topic
+# false: 删除命令无效（Kafka 4.0 默认为 true）
+delete.topic.enable=true
+
+```
+
+
+
+
+
+### 3.开放9092,9093端口
+
+
+
+假设你用的是 **CentOS/RedHat Linux**，使用 `firewalld` 管理防火墙。
+
+#### 查看防火墙状态
+
+```
+sudo firewall-cmd --state
+```
+
+#### 放行端口（永久生效）
+
+针对每台节点执行：
+
+```
+sudo firewall-cmd --zone=public --add-port=9092/tcp --permanent
+sudo firewall-cmd --zone=public --add-port=9093/tcp --permanent
+```
+
+#### 重新加载防火墙
+
+```
+sudo firewall-cmd --reload
+```
+
+#### 验证端口是否放行
+
+```
+sudo firewall-cmd --list-ports
+```
+
+应该看到：
+
+```
+9092/tcp 9093/tcp
+```
+
+
+
+
+
+### 4.node1上生成UUID
+
+```bash
+[root@node1 kafka4]# cd /hli/software/kafka4
+[root@node1 kafka4]# bin/kafka-storage.sh random-uuid
+```
+
+```bash
+n8vjTMpNSPWbUOrWJNnHJg
+```
+
+注：所有集群的实例上都使用统一的UUID
+
+
+
+
+
+### 5.集群所有实例都加上统一UUID
+
+
+
+需要在 **Node1、Node2、Node3** 的 `server.properties` 中加上这一行：
+
+```bash
+#统一node1生成UUID
+cluster.id=n8vjTMpNSPWbUOrWJNnHJg
+```
+
+最好放在文件的开头，方便管理，例如：
+
+```
+############################# 基础设置 #############################
+
+#统一node1生成UUID
+cluster.id=n8vjTMpNSPWbUOrWJNnHJg
+
+process.roles=broker,controller
+node.id=1
+...
+```
+
+⚡ 注意：
+
+- **cluster.id 必须所有节点一致**，否则集群无法启动
+- 只要保持一致，这一步只需要执行一次 UUID 生成
+
+
+
+
+
+### 6.格式化节点存储
+
+在 **每个节点**（Node1/Node2/Node3）执行以下命令：
+
+```
+cd /hli/software/kafka4
+bin/kafka-storage.sh format -t n8vjTMpNSPWbUOrWJNnHJg -c config/server.properties
+```
+
+这一步会初始化 Kafka KRaft 存储目录。
+
+
+
+```bash
+[root@node1 kafka4]# bin/kafka-storage.sh format   -t n8vjTMpNSPWbUOrWJNnHJg   -c config/server.properties
+```
+
+```bash
+Formatting metadata directory /hli/software/kafka4/datas/kafka-logs-node1 with metadata.version 4.0-IV3.
+```
+
+
+
+
+
+### 7.启动kafka
+
+```bash
+bin/kafka-server-start.sh config/server.properties
+```
+
+`bin/kafka-server-start.sh config/server.properties` 默认是**前台运行**的（会占用当前终端）。
+ 如果你直接这么启动，关掉终端 Kafka 就会退出。
+
+
+
+#### ✅ 后台运行的正确命令：
+
+```
+bin/kafka-server-start.sh -daemon config/server.properties
+```
+
+#### 💡 启动后你可以用以下命令确认 Kafka 是否真的启动成功：
+
+1. ##### **看进程**
+
+   ```
+   ps -ef | grep kafka
+   ```
+
+   > 看到类似 `/kafka.Kafka config/server.properties` 的进程说明启动成功。
+
+2. ##### **看端口（Kafka 默认监听 9092 或 9093）**
+
+   ```
+   netstat -ntlp | grep 9092
+   ```
+
+   > 例如看到：
+
+   ```
+   tcp6  0  0 192.168.1.101:9092  LISTEN  java
+   ```
+
+   表示 Kafka 监听正常。
+
+3. ##### **看日志**
+
+   ```
+   tail -n 50 logs/server.log
+   ```
+
+   > 如果日志里出现：
+
+   ```
+   [KafkaServer id=1] started (kafka.server.KafkaServer)
+   ```
+
+   那就是完全启动成功 ✅。
+
+
+
+
+
+
+
+### 8.验证集群状态
+
+三个节点都启动后，在任意节点执行：
+
+```bash
+cd /hli/software/kafka4
+
+# 1. 查看集群元数据
+bin/kafka-metadata-quorum.sh --bootstrap-server 192.168.254.2:9092 describe --status
+
+# 2. 查看 Broker 列表（应该显示 3 个 Broker）
+bin/kafka-broker-api-versions.sh --bootstrap-server 192.168.254.2:9092 | grep id
+
+# 3. 创建测试 Topic
+bin/kafka-topics.sh --create --topic test-topic \
+  --partitions 3 --replication-factor 3 \
+  --bootstrap-server 192.168.254.2:9092
+
+# 4. 查看 Topic 详情
+bin/kafka-topics.sh --describe --topic test-topic \
+  --bootstrap-server 192.168.56.101:9092
+```
+
+如果能正常执行这些命令，说明集群部署成功！
+
+现在请按照上面的步骤在 Node2 上重新执行，记得先 `cd /hli/software/kafka4`。
+
+
+
+
+
+#### 查看元数据
+
+```bash
+[root@node1 kafka4]# bin/kafka-metadata-quorum.sh --bootstrap-server 192.168.254.2:9092 describe --status
+```
+
+```bash
+ClusterId:              n8vjTMpNSPWbUOrWJNnHJg
+LeaderId:               1
+LeaderEpoch:            3
+HighWatermark:          823
+MaxFollowerLag:         0
+MaxFollowerLagTimeMs:   0
+CurrentVoters:          [{"id": 1, "directoryId": null, "endpoints": ["CONTROLLER://192.168.56.101:9093"]}, {"id": 2, "directoryId": null, "endpoints": ["CONTROLLER://192.168.56.102:9093"]}, {"id": 3, "directoryId": null, "endpoints": ["CONTROLLER://192.168.56.103:9093"]}]
+CurrentObservers:       []
+```
+
+**Kafka 控制器 quorum（控制器选举集群）已经启动并运行正常。**
+
+我们来逐项分析一下这段状态信息：
+
+| 字段                               | 含义                              | 当前状态                             |
+| ---------------------------------- | --------------------------------- | ------------------------------------ |
+| `ClusterId`                        | Kafka 集群唯一 ID（格式化时生成） | ✅ `n8vjTMpNSPWbUOrWJNnHJg`           |
+| `LeaderId`                         | 当前控制器 leader 的 broker id    | ✅ `1`（说明当前节点是控制器 Leader） |
+| `LeaderEpoch`                      | 控制器选举的 epoch（每次选主+1）  | ✅ `3`（说明选主已经完成）            |
+| `HighWatermark`                    | 控制器日志同步进度                | ✅ 表示日志复制健康                   |
+| `CurrentVoters`                    | 当前参与控制器投票的节点          | ✅ 三个节点都在：`1, 2, 3`            |
+| `CONTROLLER://192.168.56.xxx:9093` | 表示各 broker 的控制器通信地址    | ✅ 都识别正确                         |
+| `CurrentObservers`                 | 观察者节点（可选）                | 空，正常                             |
+
+------
+
+###### ✅ 结论：
+
+你的这台 Kafka（`id=1`）已经：
+
+- 成功完成 **Raft controller 选举**
+- 当前是整个集群的 **Controller Leader**
+- 控制器日志同步状态正常
+   这说明启动 **非常成功**。🎯
+
+
+
+```bash
+[root@node1 kafka4]# bin/kafka-broker-api-versions.sh --bootstrap-server 192.168.254.2:9092 | grep id
+
+192.168.56.102:9092 (id: 2 rack: null isFenced: false) -> (
+192.168.56.103:9092 (id: 3 rack: null isFenced: false) -> (
+192.168.56.101:9092 (id: 1 rack: null isFenced: false) -> (
+```
+
+
+
+
+
+
+
+#### 创建topic
+
+```bash
+[root@node1 kafka4]# bin/kafka-topics.sh --create --topic test-topic \
+>   --partitions 3 --replication-factor 3 \
+>   --bootstrap-server 192.168.254.2:9092
+```
+
+```bash
+Created topic test-topic.
+```
+
+
+
+
+
+```bash
+[root@node1 kafka4]# bin/kafka-topics.sh --describe --topic test-topic --bootstrap-server 192.168.254.2:9092
+```
+
+```bash
+Topic: test-topic	TopicId: CrHomeL5T0G52b_LvEeveg	PartitionCount: 3	ReplicationFactor: 3	Configs: segment.bytes=1073741824
+	Topic: test-topic	Partition: 0	Leader: 1	Replicas: 1,2,3	Isr: 1,2,3	Elr: 	LastKnownElr: 
+	Topic: test-topic	Partition: 1	Leader: 2	Replicas: 2,3,1	Isr: 2,3,1	Elr: 	LastKnownElr: 
+	Topic: test-topic	Partition: 2	Leader: 3	Replicas: 3,1,2	Isr: 3,1,2	Elr: 	LastKnownElr: 
+```
+
+
+
+这说明你的 **Kafka 集群（3 节点）现在已经完全正常运行**，控制器选举、数据副本、ISR 同步全部健康。
+ 我们来细看一下这条输出，逐项确认一下系统状态 👇
+
+------
+
+##### ✅ 核心状态分析
+
+| 字段                        | 说明                                           | 当前状态           |
+| --------------------------- | ---------------------------------------------- | ------------------ |
+| `Created topic test-topic.` | 成功创建了主题 `test-topic`                    | ✅ 成功             |
+| `PartitionCount: 3`         | 分区数为 3                                     | ✅ 正常             |
+| `ReplicationFactor: 3`      | 每个分区副本数为 3（即所有 broker 各保存一份） | ✅ 分布健康         |
+| `Leader: 1 / 2 / 3`         | 每个分区的 Leader 在不同 broker 上（1、2、3）  | ✅ 负载均衡         |
+| `Replicas: 1,2,3`           | 每个分区都有三台机器存放副本                   | ✅ 冗余配置正确     |
+| `Isr: 1,2,3`                | 所有副本都同步（In-Sync Replica）              | ✅ 副本同步完全正常 |
+
+------
+
+##### 💯 结论
+
+🚀 **你的 Kafka 集群已经完美搭建成功！**
+ 控制器、broker、Raft quorum、topic 副本机制——全部处于理想状态。
+
+
+
+
+
+#### 验证数据状态
+
+```bash
+bin/kafka-console-producer.sh \
+  --bootstrap-server 192.168.254.2:9092 \
+  --topic test-topic
+```
+
+运行后就会进入交互输入模式：
+
+> hello kafka
+> this is node1 test
+> 输入几行文字，按下 Ctrl + D（或 Ctrl + C）退出。
+
+✅ 然后验证消息消费
+
+```bash
+bin/kafka-console-consumer.sh \
+  --bootstrap-server 192.168.254.2:9092 \
+  --topic test-topic \
+  --from-beginning
+```
+
+看到刚才发送的 “hello kafka” 等内容就说明整个 Kafka 流程 生产 + 消费 全通了。
+
+
+
+>验证成功
+
+```bash
+[root@node1 kafka4]# bin/kafka-console-producer.sh   --bootstrap-server 192.168.254.2:9092   --topic test-topic
+>你好呀！kafka我爱你！
+>[root@node1 kafka4]#bin/kafka-console-consumer.sh   --bootstrap-server 192.168.254.2:9092   --topic test-topic   --from-beginning
+你好呀！kafka我爱你！
+你好呀！kafka！
+```
+
+这输出说明——你的 **Kafka KRaft 模式集群（多节点 controller + broker）已经彻底跑通了**：
+ ✅ Controller 选举正常（Leader: 1）
+ ✅ Topic 创建成功（3 分区 × 3 副本）
+ ✅ Producer 写入成功
+ ✅ Consumer 从日志拉取成功
+ ✅ ISR（同步副本）健康、无延迟
+
+> 换句话说：你现在这套集群，已经是一个真正意义上可用的分布式 Kafka 系统。
+
+
+
+
+
+### 9.kafka脚本
+
+
+
+> 写个启动脚本（方便集群重启）
+
+建议你在每个节点上 `/hli/software/kafka4/start-kafka.sh` 里写：
+
+#### start-kafka.sh
+
+```bash
+#!/bin/bash
+
+KAFKA_HOME="/hli/software/kafka4"
+CONFIG_FILE="$KAFKA_HOME/config/server.properties"
+
+# 检查 Kafka 是否已运行
+if netstat -tulnp 2>/dev/null | grep ':9092' > /dev/null; then
+    echo "Kafka 已在运行，跳过启动。"
+    exit 0
+fi
+
+echo "正在启动 Kafka..."
+cd "$KAFKA_HOME" || { echo "Kafka 目录不存在"; exit 1; }
+
+bin/kafka-server-start.sh -daemon "$CONFIG_FILE"
+
+# 等待 Kafka 启动
+MAX_WAIT=30
+WAITED=0
+while ! netstat -tulnp 2>/dev/null | grep ':9092' > /dev/null; do
+    sleep 1
+    WAITED=$((WAITED+1))
+    if [ $WAITED -ge $MAX_WAIT ]; then
+        echo "Kafka 启动超时 ❌"
+        exit 1
+    fi
+done
+
+echo "Kafka 启动成功 ✅"
+```
+
+
+
+```bash
+bin/kafka-server-start.sh -daemon config/server.properties
+```
+
+
+
+
+
+#### stop-kafka.sh
+
+```bash
+#!/bin/bash
+# Kafka 停止脚本（端口检测法）
+
+KAFKA_PORT=9092
+
+echo "停止 Kafka..."
+
+# 检查 Kafka 是否运行（端口检测）
+if netstat -tulnp 2>/dev/null | grep ":$KAFKA_PORT" > /dev/null; then
+    PID=$(netstat -tulnp 2>/dev/null | grep ":$KAFKA_PORT" | awk '{print $7}' | cut -d'/' -f1)
+    if [ -n "$PID" ]; then
+        kill -9 "$PID"
+        echo "Kafka (PID $PID) 已停止"
+    else
+        echo "找不到 Kafka 的 PID，停止失败"
+    fi
+else
+    echo "Kafka 未运行"
+fi
+```
+
+
+
+
+
+#### 赋权
+
+>使其生效
+
+```bash
+chmod +x /hli/software/kafka4/start-kafka.sh
+chmod +x /hli/software/kafka4/stop-kafka.sh
+```
+
+------
+
+### 
+
+随时用下面命令查看当前 Controller 与 ISR：
+
+```
+bin/kafka-metadata-quorum.sh describe --bootstrap-server 192.168.56.101:9092
+```
+
+或者：
+
+```
+bin/kafka-topics.sh --describe --topic test-topic --bootstrap-server 192.168.56.101:9092
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+## Redis集群(哨兵)
+
+
+
+## MySQL读写分离集群
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
