@@ -330,9 +330,7 @@ mysql> show databases;
 
 
 
-
-
-
+##### 创建`tx_lab`库
 
 ```sql
 mysql> CREATE DATABASE IF NOT EXISTS tx_lab CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
@@ -340,6 +338,8 @@ Query OK, 1 row affected (0.05 sec)
 ```
 
 
+
+##### 创建`account`表
 
 ```sql
 mysql> USE tx_lab;
@@ -365,6 +365,8 @@ mysql> INSERT INTO account (name, balance) VALUES
 Query OK, 3 rows affected (0.04 sec)
 Records: 3  Duplicates: 0  Warnings: 0
 ```
+
+
 
 
 
