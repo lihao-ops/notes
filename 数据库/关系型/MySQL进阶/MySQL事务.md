@@ -476,6 +476,74 @@ SET GLOBAL TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 
 
 
+###### 实际验证
+
+```sql
+-- ✅ 1️⃣ 错误示例（带连字符的语法是错的）
+-- MySQL 不接受中间的 “-”，正确写法要用空格分隔。
+set global transaction isolation level read-uncommitted;
+-- ❌ ERROR 1064 (42000)
+
+-- ✅ 2️⃣ 正确写法（用空格分隔）
+-- 设置全局（GLOBAL）默认事务隔离级别为 “读未提交”
+-- 该设置只对 **新连接** 生效，对当前会话不影响。
+set global transaction isolation level read uncommitted;
+-- Query OK, 0 rows affected (0.00 sec)
+
+-- ✅ 3️⃣ 查看当前会话的事务隔离级别（SESSION）
+-- 仍然是默认值 REPEATABLE-READ（可重复读）
+-- 因为 GLOBAL 修改不会影响已经存在的连接
+SHOW VARIABLES LIKE 'transaction_isolation';
+-- +-----------------------+-----------------+
+-- | Variable_name         | Value           |
+-- +-----------------------+-----------------+
+-- | transaction_isolation | REPEATABLE-READ |
+-- +-----------------------+-----------------+
+
+-- ✅ 4️⃣ 查看全局事务隔离级别（GLOBAL）
+-- 已成功变为 READ-UNCOMMITTED
+SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
+-- +-----------------------+------------------+
+-- | Variable_name         | Value            |
+-- +-----------------------+------------------+
+-- | transaction_isolation | READ-UNCOMMITTED |
+-- +-----------------------+------------------+
+
+-- ✅ 5️⃣ 修改当前会话隔离级别为 READ UNCOMMITTED
+-- 使用 SESSION 级别设置可立即生效，无需重连。
+SET SESSION TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+-- Query OK, 0 rows affected (0.00 sec)
+
+-- ✅ 6️⃣ 验证当前会话隔离级别已生效
+SHOW VARIABLES LIKE 'transaction_isolation';
+-- +-----------------------+------------------+
+-- | Variable_name         | Value            |
+-- +-----------------------+------------------+
+-- | transaction_isolation | READ-UNCOMMITTED |
+-- +-----------------------+------------------+
+
+-- ✅ 7️⃣ 验证全局仍保持 READ-UNCOMMITTED
+-- 当前会话的修改不会影响全局配置（隔离作用域相反）
+SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
+-- +-----------------------+------------------+
+-- | Variable_name         | Value            |
+-- +-----------------------+------------------+
+-- | transaction_isolation | READ-UNCOMMITTED |
+-- +-----------------------+------------------+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 ## 2. ACID 特性深度解析
 
 ### 2.1 原子性（Atomicity）
