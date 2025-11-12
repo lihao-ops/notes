@@ -425,6 +425,53 @@ mysql> SHOW VARIABLES LIKE 'innodb_flush_log_at_trx_commit';
 
 
 
+##### transaction_isolation(控制事务隔离级别)
+
+
+
+###### 🎯 **控制事务隔离级别（影响“隔离性”）**
+
+| 值                 | 中文说明         | 特性                       | 可见性特点           |
+| ------------------ | ---------------- | -------------------------- | -------------------- |
+| `READ-UNCOMMITTED` | 读未提交         | 有脏读                     | 读到未提交事务       |
+| `READ-COMMITTED`   | 读已提交         | 无脏读，有不可重复读       | 每次查询重新生成快照 |
+| `REPEATABLE-READ`  | 可重复读（默认） | 无脏读无不可重复读，有幻读 | 同事务快照一致       |
+| `SERIALIZABLE`     | 串行化           | 完全隔离                   | 加锁执行，性能最低   |
+
+
+
+###### 查看
+
+```sql
+SHOW VARIABLES LIKE 'transaction_isolation';
+```
+
+
+
+```sql
+mysql> SHOW VARIABLES LIKE 'transaction_isolation';
+
+
++-----------------------+-----------------+
+| Variable_name         | Value           |
++-----------------------+-----------------+
+| transaction_isolation | REPEATABLE-READ |
++-----------------------+-----------------+
+1 row in set (0.00 sec)
+```
+
+注意：这是默认事务隔离级别：REPEATABLE-READ：可重复读（默认）
+
+
+
+
+
+###### 修改
+
+```sql
+SET GLOBAL TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+```
+
 
 
 
