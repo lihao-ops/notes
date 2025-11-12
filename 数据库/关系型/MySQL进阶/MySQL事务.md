@@ -305,6 +305,75 @@ COMMIT;
 
 
 
+### 1.4 实际执行
+
+
+
+#### 环境准备
+
+> 创建实验所需库`tx_lab`以及表`account`
+
+```sql
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| sys                |
+| test_sql_flow      |
+| wordpress          |
++--------------------+
+6 rows in set (0.03 sec)
+```
+
+
+
+
+
+
+
+```sql
+mysql> CREATE DATABASE IF NOT EXISTS tx_lab CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+Query OK, 1 row affected (0.05 sec)
+```
+
+
+
+```sql
+mysql> USE tx_lab;
+Database changed
+mysql> -- 建立事务测试表（建议完整版本）
+mysql> DROP TABLE IF EXISTS account;
+Query OK, 0 rows affected, 1 warning (0.03 sec)
+
+mysql> CREATE TABLE account (
+    ->     id INT PRIMARY KEY AUTO_INCREMENT COMMENT '主键',
+    ->     name VARCHAR(20) NOT NULL COMMENT '账户名称',
+    ->     balance DECIMAL(10,2) NOT NULL COMMENT '账户余额',
+    ->     version INT NOT NULL DEFAULT 0 COMMENT 'MVCC版本号',
+    ->     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
+    -> ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事务与MVCC实验表';
+Query OK, 0 rows affected (0.07 sec)
+
+mysql> -- 初始化测试数据
+mysql> INSERT INTO account (name, balance) VALUES
+    -> ('A', 1000.00),
+    -> ('B', 1000.00),
+    -> ('C', 1000.00);
+Query OK, 3 rows affected (0.04 sec)
+Records: 3  Duplicates: 0  Warnings: 0
+```
+
+
+
+
+
+
+
+
+
 
 
 
