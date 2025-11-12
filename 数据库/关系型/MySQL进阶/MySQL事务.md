@@ -602,19 +602,28 @@ mysql> SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
 
 ###### 答疑
 
+💬 面试标准答法
 
+> **Q1：如果设置了当前会话的隔离级别为 READ UNCOMMITTED（读未提交），重启 MySQL 后还会生效吗？**
 
->如果设置了当前会话的隔离级别为读未提交，那么等重启MySQL后，会在全局生效吗？
+**A：不会。**
+ `SET SESSION TRANSACTION ISOLATION LEVEL ...` 只在**当前会话**有效。
 
+- 断开连接（退出 MySQL）后，该设置立即失效；
+- 重启 MySQL 也不会保留此值；
+- 下次连接时会自动继承全局（`GLOBAL`）的默认隔离级别。
 
+------
 
+> **Q2：如果设置了全局隔离级别为 READ UNCOMMITTED，重启 MySQL 或重新登录后会怎样？**
 
+**A：会生效。**
+ `SET GLOBAL TRANSACTION ISOLATION LEVEL ...` 修改的是**全局默认值**，
+ 影响所有**新建连接**。
 
->如果设置全局隔离级别为读未提交，重启MySQL或者重新登录MySQL就会全局生效，当前会话暂不生效对吧？
-
-
-
-
+- 无需重启 MySQL；
+- 只要重新登录或新建连接，就会自动应用新的全局隔离级别；
+- 已经存在的连接仍保持原来的 session 值（不会被强制改变）。
 
 
 
@@ -670,7 +679,10 @@ SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
 
 
 
+三、总结记忆口诀
 
+> **GLOBAL 改未来，SESSION 改现在。**
+>  **新连继承全局，老连保留当前。**
 
 
 
