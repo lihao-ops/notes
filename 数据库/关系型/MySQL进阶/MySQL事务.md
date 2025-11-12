@@ -438,7 +438,7 @@ mysql> SHOW VARIABLES LIKE 'innodb_flush_log_at_trx_commit';
 | `REPEATABLE-READ`  | 可重复读（默认） | 无脏读无不可重复读，有幻读 | 同事务快照一致       |
 | `SERIALIZABLE`     | 串行化           | 完全隔离                   | 加锁执行，性能最低   |
 
-
+set global transaction isolation level repeatable read;
 
 ###### 查看
 
@@ -574,6 +574,103 @@ SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
 -- | transaction_isolation | READ-UNCOMMITTED |
 -- +-----------------------+------------------+
 ```
+
+
+
+
+
+>记得设置回来默认的可重复读
+
+```sql
+mysql> set global transaction isolation level repeatable read;
+
+
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
++-----------------------+-----------------+
+| Variable_name         | Value           |
++-----------------------+-----------------+
+| transaction_isolation | REPEATABLE-READ |
++-----------------------+-----------------+
+1 row in set (0.00 sec)
+```
+
+
+
+
+
+###### 答疑
+
+
+
+>如果设置了当前会话的隔离级别为读未提交，那么等重启MySQL后，会在全局生效吗？
+
+
+
+
+
+>如果设置全局隔离级别为读未提交，重启MySQL或者重新登录MySQL就会全局生效，当前会话暂不生效对吧？
+
+
+
+
+
+
+
+###### 生效范围
+
+🧩 一、隔离级别的继承规则
+
+> **每次新建连接（登录 MySQL）时，当前会话（SESSION）会自动继承全局（GLOBAL）的隔离级别。**
+
+也就是说：
+
+- 你现在执行的
+
+  ```sql
+  SET GLOBAL TRANSACTION ISOLATION LEVEL REPEATABLE READ;
+  ```
+
+  已经把全局配置改回默认值 `REPEATABLE-READ`。
+
+- 之后当你退出当前连接、重新登录时：
+   系统会自动将新 session 的隔离级别设置为这个全局默认值。
+
+------
+
+
+
+✅ 二、验证方式（推荐你重新登录后执行）
+
+```sql
+-- 验证当前会话隔离级别
+SHOW VARIABLES LIKE 'transaction_isolation';
+```
+
+结果应该是：
+
+```sql
+| transaction_isolation | REPEATABLE-READ |
+```
+
+同时：
+
+```sql
+SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
+```
+
+也会是：
+
+```sql
+| transaction_isolation | REPEATABLE-READ |
+```
+
+说明两者一致，新连接已经同步使用全局设置。
+
+
+
+
 
 
 
