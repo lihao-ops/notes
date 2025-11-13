@@ -59,8 +59,8 @@ COMMIT; -- 提交事务
 -- ==========================================
 
 -- 【准备工作】创建数据库和表
-CREATE DATABASE IF NOT EXISTS tx_lab CHARACTER SET utf8mb4;
-USE tx_lab;
+CREATE DATABASE IF NOT EXISTS transaction_study CHARACTER SET utf8mb4;
+USE transaction_study;
 
 DROP TABLE IF EXISTS account;
 CREATE TABLE account (
@@ -330,10 +330,10 @@ mysql> show databases;
 
 
 
-##### 创建`tx_lab`库
+##### 创建`transaction_study`库
 
 ```sql
-mysql> CREATE DATABASE IF NOT EXISTS tx_lab CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+mysql> CREATE DATABASE IF NOT EXISTS transaction_study CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 Query OK, 1 row affected (0.05 sec)
 ```
 
@@ -342,7 +342,7 @@ Query OK, 1 row affected (0.05 sec)
 ##### 创建`account`表
 
 ```sql
-mysql> USE tx_lab;
+mysql> USE transaction_study;
 Database changed
 mysql> -- 建立事务测试表（建议完整版本）
 mysql> DROP TABLE IF EXISTS account;
