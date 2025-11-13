@@ -647,3 +647,514 @@ SELECT @result;
 
 
 
+### 📚 模块2: 锁机制深度实验
+
+```sql
+# MySQL锁机制深度实验手册
+
+## 实验6: 行锁与表锁的触发条件
+
+### 实验目标
+理解什么情况下触发行锁，什么情况下退化为表锁
+
+### 场景A: 主键等值查询（行锁）
+
+**会话A**
+​```sql
+BEGIN;
+SELECT * FROM account_transaction WHERE id = 1 FOR UPDATE;
+-- 锁定：仅id=1这一行（聚簇索引行锁）
+​```
+
+**会话B（并发访问其他行）**
+​```sql
+BEGIN;
+SELECT * FROM account_transaction WHERE id = 2 FOR UPDATE;
+-- 成功！（不同行互不干扰）
+COMMIT;
+​```
+
+**会话B（访问同一行）**
+​```sql
+BEGIN;
+UPDATE account_transaction SET balance = balance + 100 WHERE id = 1;
+-- 阻塞！等待会话A释放锁
+​```
+
+**验证锁信息**
+​```sql
+-- 新开会话查询
+SELECT 
+    ENGINE_TRANSACTION_ID,
+    OBJECT_NAME,
+    INDEX_NAME,
+    LOCK_TYPE,
+    LOCK_MODE,
+    LOCK_STATUS,
+    LOCK_DATA
+FROM performance_schema.data_locks
+WHERE OBJECT_NAME = 'account_transaction'\G
+
+/*
+预期输出:
+LOCK_TYPE: RECORD
+LOCK_MODE: X
+INDEX_NAME: PRIMARY
+LOCK_DATA: 1 (主键值)
+*/
+​```
+
+### 场景B: 无索引查询（表锁）
+
+**会话A**
+​```sql
+-- 先删除测试索引
+ALTER TABLE account_transaction DROP INDEX idx_user_id;
+
+BEGIN;
+SELECT * FROM account_transaction WHERE user_id = 1001 FOR UPDATE;
+-- 警告：无索引，触发全表扫描锁定！
+​```
+
+**会话B（尝试访问任意行）**
+​```sql
+BEGIN;
+UPDATE account_transaction SET balance = balance + 100 WHERE id = 10;
+-- 阻塞！整张表被锁定
+​```
+
+**恢复索引**
+​```sql
+ROLLBACK; -- 会话A和B都回滚
+ALTER TABLE account_transaction ADD INDEX idx_user_id(user_id);
+​```
+
+### 场景C: 索引失效导致锁升级
+
+**会话A**
+​```sql
+BEGIN;
+-- 隐式类型转换导致索引失效
+SELECT * FROM account_transaction 
+WHERE account_no = 20240001 -- 应该是 'ACC20240001'
+FOR UPDATE;
+-- 全表扫描 → 表锁
+​```
+
+**验证执行计划**
+​```sql
+EXPLAIN SELECT * FROM account_transaction WHERE account_no = 20240001;
+-- type: ALL（全表扫描）
+-- key: NULL（未使用索引）
+​```
+
+### 核心要点
+- ✅ 命中索引 → 行锁
+- ❌ 无索引/索引失效 → 表锁
+- ⚠️ 锁升级严重影响并发性能
+
+---
+
+## 实验7: 间隙锁与Next-Key Lock
+
+### 实验目标
+理解间隙锁的锁定范围和触发条件
+
+### 数据准备
+​```sql
+-- 查看当前balance分布
+SELECT id, balance FROM account_transaction ORDER BY balance;
+/*
+假设结果:
+id=6:  0.00
+id=4:  500.00
+id=2:  5000.00
+id=14: 6500.00
+id=15: 7200.00
+id=1:  15000.00
+id=3:  20000.00
+id=5:  100000.00
+*/
+​```
+
+### 场景A: 唯一索引等值查询
+
+**会话A（记录存在）**
+​```sql
+BEGIN;
+SELECT * FROM account_transaction WHERE account_no = 'ACC20240001' FOR UPDATE;
+-- 锁定：仅该记录（Record Lock），无Gap Lock
+​```
+
+**会话B（插入相邻记录）**
+​```sql
+BEGIN;
+INSERT INTO account_transaction 
+(user_id, account_no, account_type, balance, status, risk_level, branch_id, last_trans_time)
+VALUES 
+(3001, 'ACC20240000', 1, 1000, 1, 0, 101, NOW());
+-- 成功！唯一索引等值查询不产生Gap Lock
+COMMIT;
+​```
+
+**会话A（记录不存在）**
+​```sql
+ROLLBACK;
+BEGIN;
+SELECT * FROM account_transaction WHERE account_no = 'ACC20249999' FOR UPDATE;
+-- 锁定：间隙锁（最后一条记录到正无穷）
+​```
+
+**会话B（尝试插入间隙）**
+​```sql
+BEGIN;
+INSERT INTO account_transaction 
+(user_id, account_no, account_type, balance, status, risk_level, branch_id, last_trans_time)
+VALUES 
+(3002, 'ACC20249998', 1, 1000, 1, 0, 101, NOW());
+-- 阻塞！间隙被锁定
+​```
+
+### 场景B: 非唯一索引范围查询
+
+**会话A**
+​```sql
+BEGIN;
+SELECT * FROM account_transaction 
+WHERE balance BETWEEN 5000 AND 10000 
+FOR UPDATE;
+
+-- Next-Key Lock锁定范围：
+-- (500, 5000]      -- Record Lock on id=2
+-- (5000, 6500]     -- Next-Key Lock
+-- (6500, 7200]     -- Next-Key Lock  
+-- (7200, 15000)    -- Gap Lock
+​```
+
+**验证锁信息**
+​```sql
+SELECT 
+    LOCK_TYPE,
+    LOCK_MODE,
+    INDEX_NAME,
+    LOCK_DATA
+FROM performance_schema.data_locks
+WHERE OBJECT_NAME = 'account_transaction'
+ORDER BY LOCK_DATA;
+
+/*
+预期包含:
+LOCK_TYPE: RECORD, LOCK_MODE: X
+LOCK_TYPE: RECORD, LOCK_MODE: X,GAP
+LOCK_DATA: supremum pseudo-record (正无穷伪记录)
+*/
+​```
+
+**会话B（测试插入）**
+​```sql
+BEGIN;
+
+-- 测试1: 在锁定范围外插入（成功）
+INSERT INTO account_transaction 
+(user_id, account_no, account_type, balance, status, risk_level, branch_id, last_trans_time)
+VALUES 
+(3003, 'ACC20240201', 1, 400, 1, 0, 101, NOW());
+-- 成功！balance=400不在锁定范围
+
+-- 测试2: 在间隙内插入（阻塞）
+INSERT INTO account_transaction 
+(user_id, account_no, account_type, balance, status, risk_level, branch_id, last_trans_time)
+VALUES 
+(3004, 'ACC20240202', 1, 6000, 1, 0, 101, NOW());
+-- 阻塞！6000在(5000, 6500]范围内
+
+ROLLBACK;
+​```
+
+### 场景C: 间隙锁不互斥
+
+**会话A**
+​```sql
+BEGIN;
+SELECT * FROM account_transaction 
+WHERE balance = 8888 -- 不存在的值
+FOR UPDATE;
+-- 锁定：(7200, 15000)间隙
+​```
+
+**会话B**
+​```sql
+BEGIN;
+SELECT * FROM account_transaction 
+WHERE balance = 9999 -- 同一间隙内的不存在值
+FOR UPDATE;
+-- 成功！间隙锁之间不冲突
+​```
+
+**会话C（尝试插入）**
+​```sql
+BEGIN;
+INSERT INTO account_transaction 
+(user_id, account_no, account_type, balance, status, risk_level, branch_id, last_trans_time)
+VALUES 
+(3005, 'ACC20240203', 1, 10000, 1, 0, 101, NOW());
+-- 阻塞！被会话A和会话B的间隙锁阻止
+​```
+
+### 核心要点
+- ✅ 唯一索引等值查询（存在）→ 仅Record Lock
+- ✅ 唯一索引等值查询（不存在）→ Gap Lock
+- ✅ 非唯一索引范围查询 → Next-Key Lock
+- ✅ 间隙锁之间不互斥，但阻塞INSERT
+
+---
+
+## 实验8: 死锁场景复现与分析
+
+### 场景A: 经典双事务死锁
+
+**会话A**
+​```sql
+BEGIN;
+UPDATE account_transaction SET balance = balance - 100 WHERE id = 1;
+-- 获得：id=1的行锁
+
+-- 等待5秒
+SELECT SLEEP(5);
+
+UPDATE account_transaction SET balance = balance + 100 WHERE id = 2;
+-- 等待：id=2的行锁（会话B持有）
+​```
+
+**会话B（2秒后启动）**
+​```sql
+BEGIN;
+UPDATE account_transaction SET balance = balance - 100 WHERE id = 2;
+-- 获得：id=2的行锁
+
+UPDATE account_transaction SET balance = balance + 100 WHERE id = 1;
+-- 等待：id=1的行锁（会话A持有）
+-- 检测到死锁！MySQL自动回滚会话B
+​```
+
+**查看死锁日志**
+​```sql
+SHOW ENGINE INNODB STATUS\G
+
+/*
+在LATEST DETECTED DEADLOCK部分查看：
+- 两个事务的持有锁
+- 两个事务的等待锁
+- 死锁检测结果
+- 回滚的事务
+*/
+​```
+
+### 场景B: 索引顺序不一致导致的死锁
+
+**会话A**
+​```sql
+BEGIN;
+-- 通过二级索引扫描（balance升序）
+UPDATE account_transaction 
+SET frozen_amount = frozen_amount + 100 
+WHERE balance BETWEEN 5000 AND 8000;
+
+-- 锁定顺序：id=2(5000) → id=14(6500) → id=15(7200)
+​```
+
+**会话B（同时启动）**
+​```sql
+BEGIN;
+-- 通过主键倒序扫描
+UPDATE account_transaction 
+SET frozen_amount = frozen_amount + 100 
+WHERE id IN (15, 14, 2);
+
+-- 锁定顺序：id=15 → id=14 → id=2（与会话A相反）
+-- 死锁！
+​```
+
+### 场景C: 间隙锁与插入意向锁冲突
+
+**会话A**
+​```sql
+BEGIN;
+SELECT * FROM account_transaction 
+WHERE balance = 6000 -- 不存在
+FOR UPDATE;
+-- 锁定：(5000, 6500)间隙
+​```
+
+**会话B**
+​```sql
+BEGIN;
+INSERT INTO account_transaction 
+(user_id, account_no, account_type, balance, status, risk_level, branch_id, last_trans_time)
+VALUES 
+(4001, 'ACC20240301', 1, 6000, 1, 0, 101, NOW());
+-- 等待：插入意向锁被间隙锁阻塞
+​```
+
+**会话A（尝试插入）**
+​```sql
+INSERT INTO account_transaction 
+(user_id, account_no, account_type, balance, status, risk_level, branch_id, last_trans_time)
+VALUES 
+(4002, 'ACC20240302', 1, 6100, 1, 0, 101, NOW());
+-- 死锁！双方都持有间隙锁，都想获取插入意向锁
+​```
+
+### 死锁预防策略
+
+​```sql
+-- 策略1: 固定加锁顺序
+-- 不推荐
+UPDATE t1, t2 SET ... WHERE random_order
+
+-- 推荐
+UPDATE t1, t2 SET ... ORDER BY id
+
+-- 策略2: 缩小事务范围
+-- 不推荐
+BEGIN;
+  SELECT ... (大量业务逻辑)
+  UPDATE ...
+COMMIT;
+
+-- 推荐
+-- 业务逻辑
+BEGIN;
+  UPDATE ...
+COMMIT;
+
+-- 策略3: 使用乐观锁替代悲观锁
+UPDATE account_transaction 
+SET balance = balance - 100, version = version + 1
+WHERE id = 1 AND version = @old_version;
+
+-- 策略4: 降低隔离级别
+SET SESSION transaction_isolation = 'READ-COMMITTED';
+-- RC级别无Gap Lock，减少死锁
+​```
+
+### 死锁监控SQL
+
+​```sql
+-- 创建死锁监控表
+CREATE TABLE deadlock_log (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    detected_time DATETIME NOT NULL,
+    deadlock_info JSON NOT NULL,
+    INDEX idx_time(detected_time)
+) ENGINE=InnoDB;
+
+-- 定期采集死锁信息（需要EVENT或外部脚本）
+INSERT INTO deadlock_log (detected_time, deadlock_info)
+SELECT 
+    NOW(),
+    JSON_OBJECT(
+        'status', VARIABLE_VALUE
+    )
+FROM performance_schema.global_status
+WHERE VARIABLE_NAME = 'Innodb_deadlocks';
+​```
+
+### 核心要点
+- ✅ 死锁本质：循环等待资源
+- ✅ MySQL自动检测并回滚较小的事务
+- ✅ 通过固定顺序、缩小范围预防
+- ✅ RC级别可减少间隙锁死锁
+
+---
+
+## 实验9: 锁等待超时与监控
+
+### 设置锁等待超时
+
+​```sql
+-- 查看当前超时设置
+SHOW VARIABLES LIKE 'innodb_lock_wait_timeout';
+-- 默认：50秒
+
+-- 会话级别设置
+SET SESSION innodb_lock_wait_timeout = 10;
+​```
+
+### 模拟锁等待超时
+
+**会话A**
+​```sql
+BEGIN;
+UPDATE account_transaction SET balance = balance + 100 WHERE id = 1;
+-- 不提交，持有锁
+SELECT SLEEP(20);
+​```
+
+**会话B**
+​```sql
+SET SESSION innodb_lock_wait_timeout = 5;
+BEGIN;
+UPDATE account_transaction SET balance = balance + 200 WHERE id = 1;
+-- 5秒后超时：ERROR 1205 (HY000): Lock wait timeout exceeded
+​```
+
+### 实时监控锁等待
+
+​```sql
+-- 查看当前锁等待
+SELECT 
+    r.trx_id AS waiting_trx_id,
+    r.trx_mysql_thread_id AS waiting_thread,
+    r.trx_query AS waiting_query,
+    r.trx_wait_started AS wait_started,
+    TIMESTAMPDIFF(SECOND, r.trx_wait_started, NOW()) AS wait_seconds,
+    b.trx_id AS blocking_trx_id,
+    b.trx_mysql_thread_id AS blocking_thread,
+    b.trx_query AS blocking_query,
+    b.trx_started AS blocking_started
+FROM information_schema.innodb_lock_waits w
+JOIN information_schema.innodb_trx r ON w.requesting_trx_id = r.trx_id
+JOIN information_schema.innodb_trx b ON w.blocking_trx_id = b.trx_id\G
+​```
+
+### 锁等待可视化分析
+
+​```sql
+-- 统计各表的锁等待情况
+SELECT 
+    OBJECT_SCHEMA,
+    OBJECT_NAME,
+    COUNT(*) AS lock_count,
+    COUNT(DISTINCT ENGINE_TRANSACTION_ID) AS trx_count,
+    SUM(CASE WHEN LOCK_STATUS = 'WAITING' THEN 1 ELSE 0 END) AS waiting_locks
+FROM performance_schema.data_locks
+GROUP BY OBJECT_SCHEMA, OBJECT_NAME
+ORDER BY waiting_locks DESC;
+​```
+
+### 核心要点
+- ✅ 合理设置超时时间（线上5-10秒）
+- ✅ 监控锁等待时长和阻塞链
+- ✅ 及时kill长时间持有锁的事务
+
+---
+
+## 锁机制总结
+
+| 锁类型 | 锁定对象 | 触发条件 | 互斥规则 |
+|--------|---------|---------|---------|
+| 表锁 | 整张表 | 无索引/索引失效 | 读写互斥 |
+| 行锁 | 单行记录 | 主键/唯一索引等值 | 写写互斥 |
+| 间隙锁 | 索引间隙 | 范围查询/不存在记录 | 不互斥 |
+| Next-Key Lock | 记录+间隙 | 非唯一索引范围查询 | 互斥 |
+| 插入意向锁 | 插入位置 | INSERT操作 | 与Gap Lock冲突 |
+
+**生产环境最佳实践：**
+1. 所有查询必须走索引
+2. 避免长事务
+3. 固定加锁顺序
+4. 优先使用RC级别（无特殊要求）
+5. 监控死锁和锁等待
+```
+
