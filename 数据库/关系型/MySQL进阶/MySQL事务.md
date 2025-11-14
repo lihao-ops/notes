@@ -703,7 +703,11 @@ SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
 
 
 
-## 2. ACID 特性深度解析
+## 2. ACID(原子性/一致性/隔离性/持久性)
+
+
+
+
 
 ### 2.1 原子性（Atomicity）
 
@@ -711,38 +715,73 @@ SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
 
 > **undo log（回滚日志）** 记录每次修改前的旧值，当事务回滚时，通过 undo log 恢复数据。
 
+原子性指的是：
+
+- 一个事务中的所有操作必须被当作一个不可再分的整体，
+- **要么全部成功提交，**
+- **要么全部失败回滚，**
+- **任何一步失败都不能留下部分写入。**
+
+
+
 
 
 #### 原理图
 
-```
-┌─────────────────────────────────────────────┐
-│          事务执行流程                          │
-├─────────────────────────────────────────────┤
-│  1. BEGIN                                   │
-│  2. UPDATE account SET balance = 900        │
-│     ↓ 记录 undo log: balance = 1000         │
-│  3. UPDATE account SET balance = 800        │
-│     ↓ 记录 undo log: balance = 900          │
-│  4. 异常发生！                                │
-│  5. ROLLBACK                                │
-│     ↓ 读取 undo log 链                       │
-│     ↓ 恢复 balance = 1000                    │
-│  6. 事务回滚完成                              │
-└─────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    A[开始事务] --> B[第一次更新账户余额\n账户原余额一千\n更新为九百]
+    B --> C[记录回滚日志\n旧值一千]
+    C --> D[第二次更新账户余额\n账户当前余额九百\n更新为八百]
+    D --> E[记录回滚日志\n旧值九百]
+    E --> F[执行过程中发生异常]
+    F --> G[执行回滚操作]
+    G --> H[根据回滚日志恢复为九百]
+    H --> I[继续读取下一条回滚日志]
+    I --> J[根据回滚日志恢复为一千]
+    J --> K[事务回滚完成]
 ```
 
 #### 验证代码
 
 ```java
-@Test
-@Transactional
-void testAtomicity() {
-    accountRepository.save(account1); // 操作1
-    accountRepository.save(account2); // 操作2
-    throw new RuntimeException();     // 触发回滚
-    // ✅ 结果：account1 和 account2 都不会保存
-}
+    /**
+     * 方法说明 / Method Description:
+     * 中文：原子性（Atomicity）验证：事务内异常触发整体回滚，任何部分写入都不会生效。
+     * English: Atomicity verification: exception in transaction triggers full rollback; no partial writes persist.
+     * <p>
+     * 参数 / Parameters: 无
+     * 返回值 / Return: 无
+     * 异常 / Exceptions: SQL 执行异常或断言失败会使测试失败
+     */
+    @Test
+    @DisplayName("ACID-Atomicity: rollback on exception leaves no partial writes")
+    void atomicityRollbackOnFailure() throws Exception {
+        try (Connection conn = dataSource.getConnection()) {
+            // 中文：关闭自动提交以手动控制事务
+            // English: Disable auto-commit to manually control transaction
+            conn.setAutoCommit(false);
+
+            // 中文：先执行第一步扣减
+            // English: Perform first deduction
+            //为什么 update 执行了但“看不到”？事务未提交 → 修改只在 当前连接 的事务上下文可见。
+            updateBalance(conn, 1L, new BigDecimal("900.00"));
+
+            // 中文：模拟异常（例如违反约束或主动抛出）
+            // English: Simulate exception (constraint violation or manual throw)
+            assertThatThrownBy(() -> updateBalance(conn, 2L, null)).isInstanceOf(Exception.class);
+
+            // 中文：异常后回滚事务，保证两个更新都不生效
+            // English: Roll back ensuring none of updates persist
+            conn.rollback();
+
+            // 中文：验证两条记录保持初始值
+            // English: Verify both rows keep initial values
+            assertThat(readBalance(conn, 1L)).isEqualByComparingTo("1000.00");
+            assertThat(readBalance(conn, 2L)).isEqualByComparingTo("2000.00");
+            log.info("实验成功：原子性验证通过；事务异常已整体回滚，未产生部分写入 / Success: Atomicity confirmed; transaction rolled back on error, no partial writes");
+        }
+    }
 ```
 
 #### 手动验证
