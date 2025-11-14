@@ -971,7 +971,10 @@ updateBalance(conn, 1L, new BigDecimal("900.00"));
 | RR 可重复读  | ✘    | ✘          | ✘（MySQL） | MVCC 固定快照 + 间隙锁 |
 | Serializable | ✘    | ✘          | ✘          | 强制排队执行           |
 
-
+- RU：最弱，不隔离
+- RC：解决脏读，但不可重复读、幻读仍可能
+- RR：MySQL最强性价比 → 解决绝大部分问题
+- Serializable：最严格但并发能力爆炸下降
 
 
 
