@@ -1089,6 +1089,7 @@ FOREIGN KEY (user_id) REFERENCES users(id);
 
 不同事务不会读到其它事务，未提交的脏数据，也不会互相篡改导致不一致。
 
+例如:
 
 
 
