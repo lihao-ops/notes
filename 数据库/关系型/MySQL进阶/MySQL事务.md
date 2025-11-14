@@ -964,19 +964,43 @@ updateBalance(conn, 1L, new BigDecimal("900.00"));
 #### 验证代码
 
 ```java
-@Test
-void testConsistency() {
-    BigDecimal totalBefore = accountRepository.sumAllBalance(); // 2000
-    
-    try {
-        transfer("A", "B", 100); // A-100, B+100
-    } catch (Exception e) {
-        // 即使失败，总额也不变
+   /**
+     * 方法说明 / Method Description:
+     * 中文：一致性（Consistency）验证：跨两行的转账在提交后保持总余额守恒，出现错误时回滚保持不变量。
+     * English: Consistency verification: cross-row transfer preserves total sum after commit; on error, rollback keeps invariant.
+     * <p>
+     * 参数 / Parameters: 无
+     * 返回值 / Return: 无
+     * 异常 / Exceptions: SQL 执行异常或断言失败会使测试失败
+     */
+    @Test
+    @DisplayName("ACID-Consistency: transfer preserves sum invariant")
+    void consistencySumInvariant() throws Exception {
+        try (Connection conn = dataSource.getConnection()) {
+            conn.setAutoCommit(false);
+
+            // 中文：初始总额
+            // English: Initial sum
+            BigDecimal sum0 = readSum(conn);
+
+            // 中文：执行从 id=1 向 id=2 转账 300
+            // English: Transfer 300 from id=1 to id=2
+            BigDecimal b1 = readBalance(conn, 1L);
+            BigDecimal b2 = readBalance(conn, 2L);
+            updateBalance(conn, 1L, b1.subtract(new BigDecimal("300.00")));
+            updateBalance(conn, 2L, b2.add(new BigDecimal("300.00")));
+
+            // 中文：提交事务
+            // English: Commit transaction
+            conn.commit();
+
+            // 中文：提交后总额应保持不变
+            // English: Sum invariant must hold after commit
+            BigDecimal sum1 = readSum(conn);
+            assertThat(sum1).isEqualByComparingTo(sum0);
+            log.info("实验成功：一致性验证通过；跨行转账后总额守恒 / Success: Consistency confirmed; cross-row transfer preserved total sum");
+        }
     }
-    
-    BigDecimal totalAfter = accountRepository.sumAllBalance(); // 2000
-    assertEquals(totalBefore, totalAfter); // ✅
-}
 ```
 
 #### 数据库约束
