@@ -812,13 +812,93 @@ innodb_max_undo_log_size = 1G  # 单个 undo log 文件最大大小
 
 
 
-##### 
+##### 如果事务在执行了 update（事务未提交）时突然断电，这次更新是否会生效？
+
+
+
+######  通俗易懂版本（你最需要记住的）
+
+- 你更新了余额为 900
+- 但还没 commit
+- 就断电了
+- MySQL 重启后：
+   → 看 redo log：没有 commit 记录
+   → 看 undo log：有旧值 1000
+   → 因为事务未提交，所以用 undo log 把 900 恢复到 1000
+
+最终结果：
+
+**这条 update 完全没生效，像从未执行过一样。**
 
 
 
 
 
+> 在 update 执行之后、commit 之前断电——这笔修改根本不会生效，也不会被持久化
 
+在执行
+
+```sql
+conn.setAutoCommit(false);
+updateBalance(conn, 1L, new BigDecimal("900.00"));
+```
+
+后断电
+
+
+
+>此时状态是：
+
+| 项目        | 状态                                |
+| ----------- | ----------------------------------- |
+| redo log    | 未写入（因为还没进入 prepare 阶段） |
+| undo log    | 已写入（记录旧值 1000.00）          |
+| buffer pool | 已修改为 900.00（脏页）             |
+| 提交？      | ❌ 没有 commit                       |
+| 事务状态    | 活跃事务（active trx）              |
+
+
+
+只要没有 commit，就意味着：
+
+> **这笔事务是“未提交事务”，重启后必须回滚。**
+
+
+
+这是原子性的本质要求：
+
+> **未提交 = 不允许留下任何痕迹。**
+
+
+
+
+
+##### 断电重启后 InnoDB 会如何处理未提交事务，undo log 与 crash recovery 的行为是什么？
+
+> InnoDB crash recovery 的流程如下：
+
+###### ① 加载 redo log
+
+发现这条 update 没有进入 prepare 阶段
+ → redo log 里找不到相关事务
+
+说明：
+
+**这个事务从未“准备提交”。**
+
+
+
+###### ② 清理 undo log
+
+重启后恢复：
+
+- 把 page 恢复为旧值（1000.00）
+- undo 日志被视为未提交事务 → 被丢弃
+
+###### ③ 事务回滚
+
+这个“回滚”不是你手动 rollback
+ 而是 **Innodb 崩溃恢复自动回滚（auto rollback）**
 
 
 
