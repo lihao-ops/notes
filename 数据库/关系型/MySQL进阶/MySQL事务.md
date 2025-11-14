@@ -944,7 +944,194 @@ updateBalance(conn, 1L, new BigDecimal("900.00"));
 
 
 
-### 2.2 一致性（Consistency）
+### 2.2 隔离性（Isolation）
+
+#### 核心原理
+
+> 通过 **锁机制 + MVCC（多版本并发控制）** 实现事务之间的隔离。
+
+
+
+
+
+
+
+
+
+
+
+#### 四种隔离级别
+
+```
+┌─────────────────────┬──────┬────────────┬──────┬────────┐
+│ 隔离级别              │ 脏读 │ 不可重复读  │ 幻读 │ 性能   │
+├─────────────────────┼──────┼────────────┼──────┼────────┤
+│ READ UNCOMMITTED    │  ✅  │     ✅     │  ✅  │ 最高   │
+│ READ COMMITTED      │  ❌  │     ✅     │  ✅  │ 高     │
+│ REPEATABLE READ(默认)│  ❌  │     ❌     │  ❌* │ 中     │
+│ SERIALIZABLE        │  ❌  │     ❌     │  ❌  │ 最低   │
+└─────────────────────┴──────┴────────────┴──────┴────────┘
+*MySQL InnoDB 通过 Next-Key Lock 解决幻读
+```
+
+#### 脏读示例
+
+```sql
+-- 时间线 T1: 事务A                T2: 事务B
+-- -----------------------------------------------
+-- T1:     START TRANSACTION;
+-- T2:                             START TRANSACTION;
+-- T3:     UPDATE ... balance=500;
+-- T4:                             SELECT balance; -- 读到500（脏数据）
+-- T5:     ROLLBACK;               
+-- T6:                             -- 之前读到的500是无效的！
+```
+
+#### 不可重复读示例
+
+```sql
+-- 时间线 T1: 事务A                T2: 事务B
+-- -----------------------------------------------
+-- T1:     START TRANSACTION;
+-- T2:     SELECT balance;         -- 读到1000
+-- T3:                             UPDATE balance=500;
+-- T4:                             COMMIT;
+-- T5:     SELECT balance;         -- 读到500（不一致！）
+```
+
+#### 幻读示例
+
+```sql
+-- 时间线 T1: 事务A                T2: 事务B
+-- -----------------------------------------------
+-- T1:     START TRANSACTION;
+-- T2:     SELECT COUNT(*);        -- 读到10条
+-- T3:                             INSERT INTO ...;
+-- T4:                             COMMIT;
+-- T5:     SELECT COUNT(*);        -- 读到11条（幻读！）
+```
+
+#### 验证代码
+
+```java
+// 可重复读验证
+@Test
+@Transactional(isolation = Isolation.REPEATABLE_READ)
+void testRepeatableRead() {
+    Account first = accountRepository.findById(1L).orElseThrow();
+    BigDecimal firstRead = first.getBalance(); // 第一次读
+    
+    // 另一个线程修改数据
+    updateInAnotherThread();
+    
+    Account second = accountRepository.findById(1L).orElseThrow();
+    BigDecimal secondRead = second.getBalance(); // 第二次读
+    
+    assertEquals(firstRead, secondRead); // ✅ 可重复读
+}
+```
+
+---
+
+### 2.3 持久性（Durability）
+
+#### 核心原理
+
+通过 **redo log + binlog + 两阶段提交（2PC）** 保证数据持久化。
+
+#### 两阶段提交流程图
+
+```
+┌──────────────────────────────────────────────────┐
+│            MySQL 两阶段提交（2PC）                  │
+├──────────────────────────────────────────────────┤
+│                                                  │
+│  1. 执行SQL并更新内存                              │
+│     ↓                                            │
+│  2. 写 redo log (prepare 状态) ───┐              │
+│     ↓                              │              │
+│  3. 写 binlog                      │ 阶段1: Prepare│
+│     ↓                              │              │
+│  4. 调用存储引擎提交接口 ───────────┘              │
+│     ↓                                            │
+│  5. 写 redo log (commit 状态) ────┐              │
+│     ↓                              │ 阶段2: Commit │
+│  6. 事务提交完成 ──────────────────┘              │
+│                                                  │
+│  ✅ 如果在步骤3-4之间崩溃，重启后：                │
+│     - redo log 有 prepare 标记                    │
+│     - binlog 已写入                               │
+│     → 自动提交事务                                 │
+│                                                  │
+│  ✅ 如果在步骤2-3之间崩溃，重启后：                │
+│     - redo log 有 prepare 标记                    │
+│     - binlog 未写入                               │
+│     → 自动回滚事务                                 │
+└──────────────────────────────────────────────────┘
+```
+
+#### redo log vs binlog 对比
+
+| 维度 | redo log | binlog |
+|------|----------|--------|
+| **层级** | InnoDB 引擎层 | MySQL Server 层 |
+| **作用** | 崩溃恢复 | 主从复制、数据备份 |
+| **记录内容** | 物理日志（数据页变化） | 逻辑日志（SQL语句） |
+| **写入方式** | 循环写入（固定大小） | 追加写入 |
+| **刷盘时机** | innodb_flush_log_at_trx_commit | sync_binlog |
+
+#### 刷盘策略
+
+```ini
+# my.cnf 配置
+
+# ===== redo log 刷盘策略 =====
+innodb_flush_log_at_trx_commit = 1  # 推荐金融系统
+# 0 = 每秒刷一次（可能丢1秒数据）
+# 1 = 每次提交都刷盘（最安全）
+# 2 = 每次提交写OS缓存，每秒刷盘（折中）
+
+# ===== binlog 刷盘策略 =====
+sync_binlog = 1  # 推荐金融系统
+# 0 = 不强制刷盘（依赖OS）
+# 1 = 每次提交都刷binlog（最安全）
+# N = 每N次事务刷一次（折中）
+```
+
+#### 验证持久性
+
+```bash
+# 1. 插入数据
+mysql> INSERT INTO account (name, balance) VALUES ('持久化测试', 1000);
+Query OK, 1 row affected (0.01 sec)
+
+# 2. 强制杀掉MySQL进程（模拟宕机）
+$ kill -9 $(pidof mysqld)
+
+# 3. 重启MySQL
+$ systemctl start mysql
+
+# 4. 验证数据仍然存在
+mysql> SELECT * FROM account WHERE name = '持久化测试';
++----+--------------+---------+
+| id | name         | balance |
++----+--------------+---------+
+|  1 | 持久化测试    | 1000.00 |
++----+--------------+---------+
+✅ 数据未丢失！
+```
+
+
+
+
+
+
+
+
+
+
+
+### 2.4 一致性（Consistency）
 
 #### 核心原理
 
@@ -1120,6 +1307,26 @@ FOREIGN KEY (user_id) REFERENCES users(id);
 
 
 
+###### 5.总结
+
+- 一致性是目标
+- 原子性 + 隔离性 + 持久型 = 保证一致性的手段
+- 约束 = 定义什么是"合法状态"
+
+四者合在一起才能保证一致性。
+
+
+
+>标准总结句
+
+MySQL的一致性不是单一机制实现的，而是依赖
+
+1. 约束机制定义合法状态，
+2. 再由原子性保证失败不留痕、
+3. 隔离性保证并发不破坏状态、
+4. 持久性确保提交不丢失
+
+四者共同保证事务前后始终处于一致的合法数据状态
 
 
 
@@ -1130,172 +1337,12 @@ FOREIGN KEY (user_id) REFERENCES users(id);
 
 
 
-### 2.3 隔离性（Isolation）
 
-#### 核心原理
 
-通过 **锁机制 + MVCC（多版本并发控制）** 实现事务之间的隔离。
 
-#### 四种隔离级别
 
-```
-┌─────────────────────┬──────┬────────────┬──────┬────────┐
-│ 隔离级别              │ 脏读 │ 不可重复读  │ 幻读 │ 性能   │
-├─────────────────────┼──────┼────────────┼──────┼────────┤
-│ READ UNCOMMITTED    │  ✅  │     ✅     │  ✅  │ 最高   │
-│ READ COMMITTED      │  ❌  │     ✅     │  ✅  │ 高     │
-│ REPEATABLE READ(默认)│  ❌  │     ❌     │  ❌* │ 中     │
-│ SERIALIZABLE        │  ❌  │     ❌     │  ❌  │ 最低   │
-└─────────────────────┴──────┴────────────┴──────┴────────┘
-*MySQL InnoDB 通过 Next-Key Lock 解决幻读
-```
 
-#### 脏读示例
 
-```sql
--- 时间线 T1: 事务A                T2: 事务B
--- -----------------------------------------------
--- T1:     START TRANSACTION;
--- T2:                             START TRANSACTION;
--- T3:     UPDATE ... balance=500;
--- T4:                             SELECT balance; -- 读到500（脏数据）
--- T5:     ROLLBACK;               
--- T6:                             -- 之前读到的500是无效的！
-```
-
-#### 不可重复读示例
-
-```sql
--- 时间线 T1: 事务A                T2: 事务B
--- -----------------------------------------------
--- T1:     START TRANSACTION;
--- T2:     SELECT balance;         -- 读到1000
--- T3:                             UPDATE balance=500;
--- T4:                             COMMIT;
--- T5:     SELECT balance;         -- 读到500（不一致！）
-```
-
-#### 幻读示例
-
-```sql
--- 时间线 T1: 事务A                T2: 事务B
--- -----------------------------------------------
--- T1:     START TRANSACTION;
--- T2:     SELECT COUNT(*);        -- 读到10条
--- T3:                             INSERT INTO ...;
--- T4:                             COMMIT;
--- T5:     SELECT COUNT(*);        -- 读到11条（幻读！）
-```
-
-#### 验证代码
-
-```java
-// 可重复读验证
-@Test
-@Transactional(isolation = Isolation.REPEATABLE_READ)
-void testRepeatableRead() {
-    Account first = accountRepository.findById(1L).orElseThrow();
-    BigDecimal firstRead = first.getBalance(); // 第一次读
-    
-    // 另一个线程修改数据
-    updateInAnotherThread();
-    
-    Account second = accountRepository.findById(1L).orElseThrow();
-    BigDecimal secondRead = second.getBalance(); // 第二次读
-    
-    assertEquals(firstRead, secondRead); // ✅ 可重复读
-}
-```
-
----
-
-### 2.4 持久性（Durability）
-
-#### 核心原理
-
-通过 **redo log + binlog + 两阶段提交（2PC）** 保证数据持久化。
-
-#### 两阶段提交流程图
-
-```
-┌──────────────────────────────────────────────────┐
-│            MySQL 两阶段提交（2PC）                  │
-├──────────────────────────────────────────────────┤
-│                                                  │
-│  1. 执行SQL并更新内存                              │
-│     ↓                                            │
-│  2. 写 redo log (prepare 状态) ───┐              │
-│     ↓                              │              │
-│  3. 写 binlog                      │ 阶段1: Prepare│
-│     ↓                              │              │
-│  4. 调用存储引擎提交接口 ───────────┘              │
-│     ↓                                            │
-│  5. 写 redo log (commit 状态) ────┐              │
-│     ↓                              │ 阶段2: Commit │
-│  6. 事务提交完成 ──────────────────┘              │
-│                                                  │
-│  ✅ 如果在步骤3-4之间崩溃，重启后：                │
-│     - redo log 有 prepare 标记                    │
-│     - binlog 已写入                               │
-│     → 自动提交事务                                 │
-│                                                  │
-│  ✅ 如果在步骤2-3之间崩溃，重启后：                │
-│     - redo log 有 prepare 标记                    │
-│     - binlog 未写入                               │
-│     → 自动回滚事务                                 │
-└──────────────────────────────────────────────────┘
-```
-
-#### redo log vs binlog 对比
-
-| 维度 | redo log | binlog |
-|------|----------|--------|
-| **层级** | InnoDB 引擎层 | MySQL Server 层 |
-| **作用** | 崩溃恢复 | 主从复制、数据备份 |
-| **记录内容** | 物理日志（数据页变化） | 逻辑日志（SQL语句） |
-| **写入方式** | 循环写入（固定大小） | 追加写入 |
-| **刷盘时机** | innodb_flush_log_at_trx_commit | sync_binlog |
-
-#### 刷盘策略
-
-```ini
-# my.cnf 配置
-
-# ===== redo log 刷盘策略 =====
-innodb_flush_log_at_trx_commit = 1  # 推荐金融系统
-# 0 = 每秒刷一次（可能丢1秒数据）
-# 1 = 每次提交都刷盘（最安全）
-# 2 = 每次提交写OS缓存，每秒刷盘（折中）
-
-# ===== binlog 刷盘策略 =====
-sync_binlog = 1  # 推荐金融系统
-# 0 = 不强制刷盘（依赖OS）
-# 1 = 每次提交都刷binlog（最安全）
-# N = 每N次事务刷一次（折中）
-```
-
-#### 验证持久性
-
-```bash
-# 1. 插入数据
-mysql> INSERT INTO account (name, balance) VALUES ('持久化测试', 1000);
-Query OK, 1 row affected (0.01 sec)
-
-# 2. 强制杀掉MySQL进程（模拟宕机）
-$ kill -9 $(pidof mysqld)
-
-# 3. 重启MySQL
-$ systemctl start mysql
-
-# 4. 验证数据仍然存在
-mysql> SELECT * FROM account WHERE name = '持久化测试';
-+----+--------------+---------+
-| id | name         | balance |
-+----+--------------+---------+
-|  1 | 持久化测试    | 1000.00 |
-+----+--------------+---------+
-✅ 数据未丢失！
-```
 
 ---
 
