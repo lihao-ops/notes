@@ -806,6 +806,26 @@ innodb_max_undo_log_size = 1G  # 单个 undo log 文件最大大小
 
 ---
 
+
+
+#### 问答
+
+
+
+##### 
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### 2.2 一致性（Consistency）
 
 #### 核心原理
