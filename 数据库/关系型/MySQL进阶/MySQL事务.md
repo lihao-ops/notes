@@ -62,7 +62,7 @@ COMMIT; -- 提交事务
 
 
 
-### 1.3 实践
+### 1.3 实践方案
 
 ```sql
 -- ==========================================
@@ -316,11 +316,11 @@ COMMIT;
 
 
 
-### 1.4 实际执行
+## 环境准备
 
 
 
-#### 环境准备
+### ACID环境
 
 > 创建实验所需库`tx_lab`以及表`account`
 
@@ -367,7 +367,11 @@ mysql> CREATE TABLE account (
     ->     update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间'
     -> ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='事务与MVCC实验表';
 Query OK, 0 rows affected (0.07 sec)
+```
 
+
+
+```sql
 mysql> -- 初始化测试数据
 mysql> INSERT INTO account (name, balance) VALUES
     -> ('A', 1000.00),
@@ -376,8 +380,6 @@ mysql> INSERT INTO account (name, balance) VALUES
 Query OK, 3 rows affected (0.04 sec)
 Records: 3  Duplicates: 0  Warnings: 0
 ```
-
-
 
 
 
@@ -707,7 +709,9 @@ SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
 
 #### 核心原理
 
-**undo log（回滚日志）** 记录每次修改前的旧值，当事务回滚时，通过 undo log 恢复数据。
+> **undo log（回滚日志）** 记录每次修改前的旧值，当事务回滚时，通过 undo log 恢复数据。
+
+
 
 #### 原理图
 
