@@ -2097,8 +2097,8 @@ UPDATE account SET balance = 500 WHERE id = 1; -- 等待会话A释放锁...
 
 **MVCC (Multi-Version Concurrency Control)** 多版本并发控制
 
-- 读不加锁，写不阻塞读
-- 通过保存数据的多个历史版本实现并发控制
+- **读不加锁，写不阻塞读**
+- **通过保存数据的多个历史版本实现并发控制**
 - 只在 **READ COMMITTED** 和 **REPEATABLE READ** 下生效
 
 ---
@@ -2272,7 +2272,7 @@ DELETE FROM account WHERE id = 1;
 
 ## 6. 锁机制详解*
 
-### 5.1 锁分类体系
+### 6.1 锁分类体系
 
 ```
 InnoDB 锁机制
@@ -2290,7 +2290,7 @@ InnoDB 锁机制
     └── FTWRL (Flush Tables With Read Lock)
 ```
 
-### 5.2 行锁详解
+### 6.2 行锁详解
 
 #### 记录锁 (Record Lock)
 
@@ -2347,7 +2347,7 @@ SELECT * FROM account WHERE id <= 7 FOR UPDATE;
 
 ---
 
-### 5.3 意向锁 (Intention Lock)
+### 6.3 意向锁 (Intention Lock)
 
 #### 作用
 
@@ -2384,7 +2384,7 @@ SELECT * FROM account WHERE id <= 7 FOR UPDATE;
 
 ---
 
-### 5.4 加锁示例
+### 6.4 加锁示例
 
 ```sql
 -- 共享锁 (S锁)
