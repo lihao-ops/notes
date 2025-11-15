@@ -1350,15 +1350,9 @@ updateBalance(conn, 1L, new BigDecimal("900.00"));
 
 
 
-##### 1.WAL()
+##### 1.WAL(write-ahead logging)(先日志，再落盘)
 
-
-
-
-
-
-
-#### 核心规则
+这是整个持久性的灵魂
 
 > 数据修改**必须先写日志（redo log）**，成功后才算 commit，
 > **数据页可以慢慢写回磁盘**，不着急。
@@ -1366,6 +1360,55 @@ updateBalance(conn, 1L, new BigDecimal("900.00"));
 为什么？
 
 因为磁盘随机写太慢，redo 顺序写非常快。
+
+
+
+##### 2.Redo Log(保证事务不会丢失)
+
+>Redo log(重做日志)专门记录
+
+1. 修改了哪个页
+2. 这个页里哪里位置
+3. 写入了什么内容
+
+是一个物理性质的日志，这种日志是顺序写的——>巨快
+
+
+
+>commit流程的重要原则
+
+```pgsql
+write redo log（prepare阶段）  
+↓
+flush redo log 到磁盘（fsync）  
+↓ 
+事务 commit 成功  
+↓
+数据页之后再慢慢落盘（Checkpoint）
+```
+
+只要redo log已持久化，事务就永远不会丢
+
+哪怕断电，MySQL重启的时候
+
+> Redo log 里有哪些已 commit 的事务 → 全部重做（apply），数据恢复到正确状态。
+
+这就是持久性D的保证机制
+
+
+
+##### 3.Undo Log：不是持久性，但保证回滚和多版本
+
+>Undo log主要提供
+
+- 原子性(回滚机制)
+- 
+
+
+
+
+
+
 
 
 
