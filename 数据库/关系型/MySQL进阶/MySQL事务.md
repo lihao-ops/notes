@@ -21,6 +21,38 @@
 
 ## 1. 事务基础概念
 
+
+
+### 为什么要有事务？
+
+**MySQL 每条 DML 默认都在一个隐式事务里执行。**
+
+比如你敲：
+
+```
+UPDATE account SET balance = balance - 100 WHERE id = 1;
+```
+
+MySQL 背后暗戳戳做了：
+
+```
+BEGIN;      -- 隐式事务
+write undo log
+write redo log (prepare)
+apply changes to buffer pool
+write redo log (commit)
+END;
+```
+
+你只看到了一条 SQL
+ 但 MySQL 做的是“底层控制现场的全套操作”。
+
+你没学事务，等于眼睛蒙着在高速路上开车。
+
+
+
+
+
 ### 1.1 什么是事务？
 
 > **事务（Transaction）** 是数据库的原子执行单元，它确保操作序列在失败时可完全撤销，在成功时永久生效，从而维护数据一致性。
@@ -1290,6 +1322,20 @@ updateBalance(conn, 1L, new BigDecimal("900.00"));
 ---
 
 ### 2.3 持久性（Durability）
+
+
+
+#### 简介
+
+>持久型主要解决的问题是：
+
+**一旦事务提交(commit)，其修改的数据必须永久保留在数据库中，不会丢失**。
+
+**无论发生什么故障或系统崩溃，已提交的事务数据必须保证恢复**，这就是持久型的关键所在。
+
+
+
+
 
 #### 核心原理
 
