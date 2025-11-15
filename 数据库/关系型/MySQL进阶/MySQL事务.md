@@ -735,7 +735,7 @@ SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
 
 
 
-## 2. ACID(原子性/一致性/隔离性/持久性)
+## 2. ACID(原子性/一致性/隔离性/持久性)*
 
 >在 InnoDB 中，ACID 的实现高度依赖几个核心机制：
 >
@@ -2085,7 +2085,192 @@ UPDATE account SET balance = 500 WHERE id = 1; -- 等待会话A释放锁...
 
 ---
 
-## 5. 锁机制详解
+
+
+
+
+
+
+## 5. MVCC 原理
+
+### 5.1 什么是 MVCC？
+
+**MVCC (Multi-Version Concurrency Control)** 多版本并发控制
+
+- 读不加锁，写不阻塞读
+- 通过保存数据的多个历史版本实现并发控制
+- 只在 **READ COMMITTED** 和 **REPEATABLE READ** 下生效
+
+---
+
+### 5.2 MVCC 实现机制
+
+#### 隐藏字段
+
+InnoDB 为每行数据添加三个隐藏字段：
+
+```sql
+CREATE TABLE account (
+  id INT PRIMARY KEY,
+  name VARCHAR(50),
+  balance DECIMAL(10,2),
+  -- 以下为隐藏字段（用户不可见）
+  DB_TRX_ID,    -- 最后修改该行的事务ID
+  DB_ROLL_PTR,  -- 指向undo log的回滚指针
+  DB_ROW_ID     -- 隐藏主键（仅在无主键时存在）
+);
+```
+
+#### 版本链示例
+
+```
+当前数据行:
+┌────────────────────────────────────────┐
+│ id=1, name='张三', balance=800         │
+│ DB_TRX_ID=103, DB_ROLL_PTR=0x1234     │
+└────────────────┬───────────────────────┘
+                 │
+                 ↓ (指向undo log)
+┌────────────────────────────────────────┐
+│ undo log: balance=900, trx_id=102     │
+│ roll_ptr=0x1235                       │
+└────────────────┬───────────────────────┘
+                 │
+                 ↓ (继续指向)
+┌────────────────────────────────────────┐
+│ undo log: balance=1000, trx_id=101    │
+│ roll_ptr=NULL                         │
+└────────────────────────────────────────┘
+
+✅ 通过版本链，不同事务可以读取到不同版本的数据
+```
+
+---
+
+### 5.3 ReadView 机制
+
+#### ReadView 是什么？
+
+事务开始时，InnoDB 会生成一个 **ReadView（读视图）**，记录当前活跃的事务列表，用于判断数据的可见性。
+
+#### ReadView 字段
+
+```java
+class ReadView {
+    long m_low_limit_id;     // 当前系统中最大事务ID + 1
+    long m_up_limit_id;      // 当前活跃事务中最小的事务ID
+    List<Long> m_ids;        // 当前活跃的事务ID列表
+    long m_creator_trx_id;   // 创建该ReadView的事务ID
+}
+```
+
+#### 可见性判断规则
+
+```
+给定数据行的 trx_id，判断是否可见：
+
+1. trx_id < m_up_limit_id
+   → 该版本在ReadView生成前已提交，可见 ✅
+
+2. trx_id >= m_low_limit_id
+   → 该版本在ReadView生成后才提交，不可见 ❌
+
+3. m_up_limit_id <= trx_id < m_low_limit_id
+   a) 如果 trx_id 在 m_ids 中（活跃事务）
+      → 不可见 ❌
+   b) 如果 trx_id 不在 m_ids 中（已提交）
+      → 可见 ✅
+
+4. trx_id == m_creator_trx_id
+   → 是当前事务自己修改的，可见 ✅
+```
+
+---
+
+### 5.4 MVCC 工作流程
+
+#### 场景：两个事务并发读写
+
+```
+初始数据: id=1, balance=1000, trx_id=100
+
+时间线:
+T1  事务A(trx_id=101) BEGIN
+T2  事务A 生成 ReadView(m_ids=[101])
+T3  事务A SELECT balance WHERE id=1  → 读到1000 ✅
+T4  
+T5  事务B(trx_id=102) BEGIN
+T6  事务B UPDATE balance=500 WHERE id=1
+T7  事务B COMMIT
+T8  
+T9  事务A SELECT balance WHERE id=1  → 读到1000还是500？
+
+答案取决于隔离级别：
+- READ COMMITTED: 读到500（每次SELECT生成新ReadView）
+- REPEATABLE READ: 读到1000（复用第一次的ReadView）
+```
+
+#### 详细过程（REPEATABLE READ）
+
+```
+T3时刻 事务A 第一次查询:
+1. 生成 ReadView: {m_ids=[101], m_up_limit_id=101, m_low_limit_id=102}
+2. 查找 id=1 的记录: trx_id=100
+3. 判断可见性: 100 < 101（在ReadView前已提交）→ 可见 ✅
+4. 返回 balance=1000
+
+T9时刻 事务A 第二次查询:
+1. 复用 T3 的 ReadView（REPEATABLE READ特性）
+2. 查找 id=1 的记录: trx_id=102
+3. 判断可见性: 102 >= 102（在ReadView后才提交）→ 不可见 ❌
+4. 通过 roll_ptr 找到 undo log 版本: trx_id=100, balance=1000
+5. 判断可见性: 100 < 101 → 可见 ✅
+6. 返回 balance=1000
+
+✅ 实现了可重复读！
+```
+
+---
+
+### 5.5 快照读 vs 当前读
+
+#### 快照读
+
+通过 MVCC 读取历史版本，**不加锁**
+
+```sql
+-- 快照读（不加锁）
+SELECT * FROM account WHERE id = 1;
+```
+
+#### 当前读
+
+读取最新版本，**加锁**
+
+```sql
+-- 当前读（加S锁）
+SELECT * FROM account WHERE id = 1 LOCK IN SHARE MODE;
+
+-- 当前读（加X锁）
+SELECT * FROM account WHERE id = 1 FOR UPDATE;
+
+-- 当前读（自动加X锁）
+UPDATE account SET balance = 500 WHERE id = 1;
+INSERT INTO account VALUES (...);
+DELETE FROM account WHERE id = 1;
+```
+
+
+
+
+
+
+
+---
+
+
+
+## 6. 锁机制详解*
 
 ### 5.1 锁分类体系
 
@@ -2212,177 +2397,6 @@ SELECT * FROM account WHERE id = 1 FOR UPDATE;
 UPDATE account SET balance = 500 WHERE id = 1; -- 自动加X锁
 INSERT INTO account VALUES (...);               -- 自动加X锁
 DELETE FROM account WHERE id = 1;               -- 自动加X锁
-```
-
----
-
-## 6. MVCC 原理
-
-### 6.1 什么是 MVCC？
-
-**MVCC (Multi-Version Concurrency Control)** 多版本并发控制
-
-- 读不加锁，写不阻塞读
-- 通过保存数据的多个历史版本实现并发控制
-- 只在 **READ COMMITTED** 和 **REPEATABLE READ** 下生效
-
----
-
-### 6.2 MVCC 实现机制
-
-#### 隐藏字段
-
-InnoDB 为每行数据添加三个隐藏字段：
-
-```sql
-CREATE TABLE account (
-  id INT PRIMARY KEY,
-  name VARCHAR(50),
-  balance DECIMAL(10,2),
-  -- 以下为隐藏字段（用户不可见）
-  DB_TRX_ID,    -- 最后修改该行的事务ID
-  DB_ROLL_PTR,  -- 指向undo log的回滚指针
-  DB_ROW_ID     -- 隐藏主键（仅在无主键时存在）
-);
-```
-
-#### 版本链示例
-
-```
-当前数据行:
-┌────────────────────────────────────────┐
-│ id=1, name='张三', balance=800         │
-│ DB_TRX_ID=103, DB_ROLL_PTR=0x1234     │
-└────────────────┬───────────────────────┘
-                 │
-                 ↓ (指向undo log)
-┌────────────────────────────────────────┐
-│ undo log: balance=900, trx_id=102     │
-│ roll_ptr=0x1235                       │
-└────────────────┬───────────────────────┘
-                 │
-                 ↓ (继续指向)
-┌────────────────────────────────────────┐
-│ undo log: balance=1000, trx_id=101    │
-│ roll_ptr=NULL                         │
-└────────────────────────────────────────┘
-
-✅ 通过版本链，不同事务可以读取到不同版本的数据
-```
-
----
-
-### 6.3 ReadView 机制
-
-#### ReadView 是什么？
-
-事务开始时，InnoDB 会生成一个 **ReadView（读视图）**，记录当前活跃的事务列表，用于判断数据的可见性。
-
-#### ReadView 字段
-
-```java
-class ReadView {
-    long m_low_limit_id;     // 当前系统中最大事务ID + 1
-    long m_up_limit_id;      // 当前活跃事务中最小的事务ID
-    List<Long> m_ids;        // 当前活跃的事务ID列表
-    long m_creator_trx_id;   // 创建该ReadView的事务ID
-}
-```
-
-#### 可见性判断规则
-
-```
-给定数据行的 trx_id，判断是否可见：
-
-1. trx_id < m_up_limit_id
-   → 该版本在ReadView生成前已提交，可见 ✅
-
-2. trx_id >= m_low_limit_id
-   → 该版本在ReadView生成后才提交，不可见 ❌
-
-3. m_up_limit_id <= trx_id < m_low_limit_id
-   a) 如果 trx_id 在 m_ids 中（活跃事务）
-      → 不可见 ❌
-   b) 如果 trx_id 不在 m_ids 中（已提交）
-      → 可见 ✅
-
-4. trx_id == m_creator_trx_id
-   → 是当前事务自己修改的，可见 ✅
-```
-
----
-
-### 6.4 MVCC 工作流程
-
-#### 场景：两个事务并发读写
-
-```
-初始数据: id=1, balance=1000, trx_id=100
-
-时间线:
-T1  事务A(trx_id=101) BEGIN
-T2  事务A 生成 ReadView(m_ids=[101])
-T3  事务A SELECT balance WHERE id=1  → 读到1000 ✅
-T4  
-T5  事务B(trx_id=102) BEGIN
-T6  事务B UPDATE balance=500 WHERE id=1
-T7  事务B COMMIT
-T8  
-T9  事务A SELECT balance WHERE id=1  → 读到1000还是500？
-
-答案取决于隔离级别：
-- READ COMMITTED: 读到500（每次SELECT生成新ReadView）
-- REPEATABLE READ: 读到1000（复用第一次的ReadView）
-```
-
-#### 详细过程（REPEATABLE READ）
-
-```
-T3时刻 事务A 第一次查询:
-1. 生成 ReadView: {m_ids=[101], m_up_limit_id=101, m_low_limit_id=102}
-2. 查找 id=1 的记录: trx_id=100
-3. 判断可见性: 100 < 101（在ReadView前已提交）→ 可见 ✅
-4. 返回 balance=1000
-
-T9时刻 事务A 第二次查询:
-1. 复用 T3 的 ReadView（REPEATABLE READ特性）
-2. 查找 id=1 的记录: trx_id=102
-3. 判断可见性: 102 >= 102（在ReadView后才提交）→ 不可见 ❌
-4. 通过 roll_ptr 找到 undo log 版本: trx_id=100, balance=1000
-5. 判断可见性: 100 < 101 → 可见 ✅
-6. 返回 balance=1000
-
-✅ 实现了可重复读！
-```
-
----
-
-### 6.5 快照读 vs 当前读
-
-#### 快照读
-
-通过 MVCC 读取历史版本，**不加锁**
-
-```sql
--- 快照读（不加锁）
-SELECT * FROM account WHERE id = 1;
-```
-
-#### 当前读
-
-读取最新版本，**加锁**
-
-```sql
--- 当前读（加S锁）
-SELECT * FROM account WHERE id = 1 LOCK IN SHARE MODE;
-
--- 当前读（加X锁）
-SELECT * FROM account WHERE id = 1 FOR UPDATE;
-
--- 当前读（自动加X锁）
-UPDATE account SET balance = 500 WHERE id = 1;
-INSERT INTO account VALUES (...);
-DELETE FROM account WHERE id = 1;
 ```
 
 ---
