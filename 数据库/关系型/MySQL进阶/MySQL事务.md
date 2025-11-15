@@ -737,7 +737,25 @@ SHOW GLOBAL VARIABLES LIKE 'transaction_isolation';
 
 ## 2. ACID(原子性/一致性/隔离性/持久性)
 
-
+>在 InnoDB 中，ACID 的实现高度依赖几个核心机制：
+>
+>【A - 原子性】undo log 记录修改前的版本，事务回滚时逆向恢复。
+>同时 undo log 也是 MVCC 的基础，通过版本链实现多版本并发控制。
+>
+>【D - 持久性】redo log 采用 WAL 策略，事务提交前先顺序写 redo log。
+>通过两阶段提交与 binlog 协同，保证主从一致性。
+>可以调整 innodb_flush_log_at_trx_commit 在性能和持久性间权衡。
+>
+>【I - 隔离性】核心是 MVCC + 锁：
+>- MVCC 通过 Read View + undo 版本链，让读不加锁，避免脏读和不可重复读
+>- 当前读（UPDATE/SELECT FOR UPDATE）加行锁，写写冲突时阻塞
+>- 间隙锁在 RR 级别防止幻读
+>
+>【C - 一致性】不是单独机制，而是 A+I+D 加上应用层约束（如外键、唯一索引）
+>共同保证的结果。
+>
+>工程上的关键点是：undo 和 redo 都用 WAL 但目的不同，MVCC 牺牲空间换并发，
+>两阶段提交保证了分布式环境下的数据一致性。
 
 
 
