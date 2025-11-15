@@ -1455,13 +1455,42 @@ checkpoint_lsn
 
 #### 高并发真实流程
 
-> 假设用户执行了
+> 假设用户执行了`balance`初始=1000
 
 ```sql
 update account set balance = balance + 100 where id = 1;
 ```
 
-1. 
+1. 写`undo log`(用于回滚、版本链)
+
+   1. ```sql
+      old value: balance=1000
+      ```
+
+   2. 生成`undo`版本节点
+
+2. 修改`buffer pool`(内存中的页)
+
+   1. ```ini
+      balance = 1100
+      ```
+
+   2. 只是改了内存，还没有落盘
+
+3. 写`redo log`(prepare阶段)
+
+   1. 记录本次修改
+
+   2. ```sql
+      page_no, offset, old_data, new_data
+      ```
+
+   3. 写入`redo log buffer`——>再`fsync`持久化到`redo`文件
+
+4. `redo log`持久化成功——>`commit`成功
+
+   1. 只要redo持久化成功
+   2. 崩溃也不怕，肯定能恢复
 
 
 
