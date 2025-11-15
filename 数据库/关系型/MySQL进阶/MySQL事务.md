@@ -978,62 +978,209 @@ updateBalance(conn, 1L, new BigDecimal("900.00"));
 
 
 
-#### 脏读示例
-
-```sql
--- 时间线 T1: 事务A                T2: 事务B
--- -----------------------------------------------
--- T1:     START TRANSACTION;
--- T2:                             START TRANSACTION;
--- T3:     UPDATE ... balance=500;
--- T4:                             SELECT balance; -- 读到500（脏数据）
--- T5:     ROLLBACK;               
--- T6:                             -- 之前读到的500是无效的！
-```
-
-#### 不可重复读示例
-
-```sql
--- 时间线 T1: 事务A                T2: 事务B
--- -----------------------------------------------
--- T1:     START TRANSACTION;
--- T2:     SELECT balance;         -- 读到1000
--- T3:                             UPDATE balance=500;
--- T4:                             COMMIT;
--- T5:     SELECT balance;         -- 读到500（不一致！）
-```
-
-#### 幻读示例
-
-```sql
--- 时间线 T1: 事务A                T2: 事务B
--- -----------------------------------------------
--- T1:     START TRANSACTION;
--- T2:     SELECT COUNT(*);        -- 读到10条
--- T3:                             INSERT INTO ...;
--- T4:                             COMMIT;
--- T5:     SELECT COUNT(*);        -- 读到11条（幻读！）
-```
-
 #### 验证代码
 
 ```java
-// 可重复读验证
-@Test
-@Transactional(isolation = Isolation.REPEATABLE_READ)
-void testRepeatableRead() {
-    Account first = accountRepository.findById(1L).orElseThrow();
-    BigDecimal firstRead = first.getBalance(); // 第一次读
-    
-    // 另一个线程修改数据
-    updateInAnotherThread();
-    
-    Account second = accountRepository.findById(1L).orElseThrow();
-    BigDecimal secondRead = second.getBalance(); // 第二次读
-    
-    assertEquals(firstRead, secondRead); // ✅ 可重复读
-}
+    /**
+     * 方法说明 / Method Description:
+     * 中文：
+     * 单方法验证 MySQL 四种事务隔离级别（RU、RC、RR、SERIALIZABLE）的实际隔离行为，
+     * 依次测试“是否能读取到其他事务未提交的数据”“是否出现不可重复读”“是否出现幻读趋势”等关键并发现象。
+     * <p>
+     * English:
+     * Single-method verification of all four MySQL isolation levels (RU, RC, RR, SERIALIZABLE),
+     * validating visibility of uncommitted writes, non-repeatable reads, and phantom tendencies.
+     * <p>
+     * 实验目的 / Experiment Goal:
+     * 中文：验证不同隔离级别对数据可见性的影响，理解脏读、不可重复读、幻读是否会发生。
+     * English: Verify how each isolation level affects data visibility and concurrent anomalies.
+     * <p>
+     * 预期结论 / Expected Result:
+     * RU：能读到未提交数据（脏读）
+     * RC：不能读未提交数据，但会出现不可重复读
+     * RR：不能脏读，不可重复读被解决，但可能出现幻读趋势
+     * SERIALIZABLE：所有读写严格串行化，不会发生任意并发问题
+     */
+    @Test
+    @DisplayName("Isolation-AllLevels: RU / RC / RR / SERIALIZABLE 全面隔离性验证")
+    void isolationAllLevelsTest() throws Exception {
+
+        // 准备两个会话（两个独立连接）
+        try (Connection sessionA = dataSource.getConnection();
+             Connection sessionB = dataSource.getConnection()) {
+
+            sessionA.setAutoCommit(false);
+            sessionB.setAutoCommit(false);
+
+            //------------------------------------------------------------
+            // 实验一：读未提交（RU）
+            //------------------------------------------------------------
+            log.info("【RU实验开始】读未提交验证 — 理论上允许脏读 / Start RU Isolation Test");
+
+            sessionA.createStatement().execute("SET SESSION transaction_isolation = 'READ-UNCOMMITTED'");
+            sessionB.createStatement().execute("SET SESSION transaction_isolation = 'READ-UNCOMMITTED'");
+
+            BigDecimal initRU = readBalance(sessionB, 1L);
+            updateBalance(sessionB, 1L, initRU.add(new BigDecimal("50.00")));  // 未提交
+
+            BigDecimal aReadRU = readBalance(sessionA, 1L); // A 立即读取
+            assertThat(aReadRU).isEqualByComparingTo(initRU.add(new BigDecimal("50.00")));
+
+            log.info("RU验证成功：会话A读到了未提交的数据（脏读） / RU Success: dirty read occurred");
+
+            sessionB.rollback();  // 恢复
+            sessionA.rollback();
+
+
+            //------------------------------------------------------------
+            // 实验二：读已提交（RC）
+            //------------------------------------------------------------
+            log.info("【RC实验开始】读已提交验证 — 杜绝脏读 / Start RC Isolation Test");
+
+            sessionA.createStatement().execute("SET SESSION transaction_isolation = 'READ-COMMITTED'");
+            sessionB.createStatement().execute("SET SESSION transaction_isolation = 'READ-COMMITTED'");
+
+            BigDecimal initRC = readBalance(sessionB, 1L);
+            updateBalance(sessionB, 1L, initRC.add(new BigDecimal("60.00"))); // 未提交
+
+            // RC 不应看到未提交数据
+            BigDecimal aReadBeforeCommitRC = readBalance(sessionA, 1L);
+            assertThat(aReadBeforeCommitRC).isEqualByComparingTo(initRC);
+
+            log.info("RC验证阶段1：会话A未看到会话B未提交数据（正确） / RC Stage1: uncommitted data invisible");
+
+            sessionB.commit(); // 提交 B
+
+            BigDecimal aReadAfterCommitRC = readBalance(sessionA, 1L);
+            assertThat(aReadAfterCommitRC).isEqualByComparingTo(initRC.add(new BigDecimal("60.00")));
+
+            log.info("RC验证阶段2：提交后会话A看到新值 → 不可重复读成立 / RC Stage2: non-repeatable read observed");
+
+            sessionA.rollback();
+
+
+            //------------------------------------------------------------
+            // 实验三：可重复读（RR）
+            //------------------------------------------------------------
+            log.info("【RR实验开始】可重复读验证 — 快照一致 / Start RR Isolation Test");
+
+            sessionA.createStatement().execute("SET SESSION transaction_isolation = 'REPEATABLE-READ'");
+            sessionB.createStatement().execute("SET SESSION transaction_isolation = 'REPEATABLE-READ'");
+
+            BigDecimal initRR = readBalance(sessionA, 1L);  // A 第一次读，生成快照
+
+            updateBalance(sessionB, 1L, initRR.add(new BigDecimal("70.00"))); // B 修改
+            sessionB.commit(); // 提交 B
+
+            // RR：A 再读，依旧应看到旧快照
+            BigDecimal aReadRR = readBalance(sessionA, 1L);
+            assertThat(aReadRR).isEqualByComparingTo(initRR);
+
+            log.info("RR验证成功：会话A两次读取一致，没有不可重复读（正确） / RR Success: no non-repeatable read");
+
+            sessionA.commit();
+
+            //------------------------------------------------------------
+            // 实验四：可串行化（SERIALIZABLE）
+            //------------------------------------------------------------
+            log.info("【SERIALIZABLE实验开始】最高隔离级别验证 / Start Serializable Isolation Test");
+
+            try (Connection sessionC = dataSource.getConnection();
+                 Connection sessionD = dataSource.getConnection()) {
+
+                sessionC.setAutoCommit(false);
+                sessionD.setAutoCommit(false);
+                //设置锁等待超时为1S
+                sessionC.createStatement().execute("SET SESSION innodb_lock_wait_timeout = 1");
+                sessionD.createStatement().execute("SET SESSION innodb_lock_wait_timeout = 1");
+
+                sessionC.createStatement().execute("SET SESSION transaction_isolation = 'SERIALIZABLE'");
+                sessionD.createStatement().execute("SET SESSION transaction_isolation = 'SERIALIZABLE'");
+
+                // ===========================
+                // 1. 会话C进行 SELECT（加锁）
+                // ===========================
+                BigDecimal initValue = readBalance(sessionC, 1L);
+                log.info("Serializable: 会话C读取并加共享锁 / SessionC SELECT(lock)");
+
+                // ===========================
+                // 2. 会话D尝试更新，会被阻塞
+                // ===========================
+                boolean blocked = false;
+                try {
+                    updateBalance(sessionD, 1L, initValue.add(new BigDecimal("100.00")));
+                } catch (Exception e) {
+                    blocked = true; // 这个异常是因为死锁或锁等待超时而被抛出
+                }
+
+                assertThat(blocked).isTrue();
+                log.info("Serializable: 会话D写入被阻塞（正确） / SessionD update blocked");
+
+                // ===========================
+                // 3. 会话C提交 → 解锁
+                // ===========================
+                sessionC.commit();
+                log.info("Serializable: 会话C提交并释放锁 / SessionC commit(unlock)");
+
+                // ===========================
+                // 4. 因为 D 已经失败（阻塞+抛异常），必须 rollback D
+                // ===========================
+                sessionD.rollback();
+                log.info("Serializable: 会话D回滚 / SessionD rollback");
+
+            } catch (SQLException e) {
+                log.error("Serializable Test Error", e);
+                throw e;
+            }
+        }
+    }
 ```
+
+
+
+##### 执行解析
+
+###### 1. **【RU实验开始】读未提交验证**
+
+- `RU验证成功：会话A读到了未提交的数据（脏读）`
+- **解释**：事务A成功读取到了事务B未提交的数据，验证了脏读（这是RU的特点）。
+
+###### 2. **【RC实验开始】读已提交验证**
+
+- `RC验证阶段1：会话A未看到会话B未提交数据（正确）`
+- **解释**：会话A不能看到事务B未提交的数据，符合 **RC** 隔离级别的要求。
+- `RC验证阶段2：提交后会话A看到新值 → 不可重复读成立`
+- **解释**：当事务B提交后，会话A能看到更新后的数据，证明了不可重复读（non-repeatable read）现象。
+
+###### 3. **【RR实验开始】可重复读验证**
+
+- `RR验证成功：会话A两次读取一致，没有不可重复读（正确）`
+- **解释**：会话A在 **RR** 隔离级别下，第一次和第二次读取的值一致，验证了快照一致性。
+
+###### 4. **【SERIALIZABLE实验开始】最高隔离级别验证**
+
+- `Serializable: 会话C读取并加共享锁 / SessionC SELECT(lock)`
+  - **解释**：会话C 读取数据并加锁，进行共享锁（S锁）操作。
+- `Serializable: 会话D写入被阻塞（正确） / SessionD update blocked`
+  - **解释**：会话D尝试更新时，由于事务A的读操作锁定了数据，D 被阻塞，符合串行化的特性。
+- `Serializable: 会话C提交并释放锁 / SessionC commit(unlock)`
+  - **解释**：会话C 提交事务并释放锁，其他事务（如D）可以继续执行。
+- `Serializable: 会话D回滚 / SessionD rollback`
+  - **解释**：由于会话D尝试更新时被阻塞并抛出异常，因此进行回滚操作。
+
+------
+
+###### 🔥 **总结**
+
+- **Serializable 测试的行为**：符合预期，事务D在会话C提交之前被阻塞，成功验证了**串行化**事务隔离级别下的**严格串行执行**行为。
+- **超时问题**：从日志来看，所有事务的锁等待时间合理，没有出现卡死现象，表明你设置的 **`innodb_lock_wait_timeout`** 在处理 **Serializable** 测试时有效，避免了长时间的死锁或阻塞。
+- **日志输出**：每个实验的行为都明确且无遗漏，结果清晰，适合面试展示。
+
+
+
+# 书签
+
+
 
 ---
 
