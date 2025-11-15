@@ -1402,7 +1402,35 @@ flush redo log 到磁盘（fsync）
 >Undo log主要提供
 
 - 原子性(回滚机制)
-- 
+- MVCC(多版本链)
+
+它不是持久性的核心，但：
+
+>Undo log也必须写进去，但不要求先fsync才能commit。
+
+真正决定持久型的事是redo log。
+
+
+
+##### 4.Doublewrite Buffer：防止半页写(崩溃时页损坏)
+
+>磁盘写入16KB数据页可能出现
+
+- 写到一半断电——>半页写
+- 页损坏，无法恢复
+
+>InnoDB的解决方案：
+
+- 数据页落盘前
+- 先写到`doublewrite buffer`(2MB区域)
+- 写成功后，再写会真实表空间
+
+>如果崩溃
+
+- 检测到脏页不完整
+- 用`doublewrite buffer`里的"完整副本修复
+
+这就是数据页一致性的保障
 
 
 
