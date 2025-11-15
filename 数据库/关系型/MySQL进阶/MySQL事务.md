@@ -1525,6 +1525,20 @@ flowchart TD
 
 
 
+
+
+#### redo log vs binlog 对比
+
+>binlog 是 MySQL Server 层记录“所有逻辑操作”的日志，用于主从复制、数据恢复、审计、持久化补充。
+
+| 维度 | redo log | binlog |
+|------|----------|--------|
+| **层级** | InnoDB 引擎层 | MySQL Server 层 |
+| **作用** | 崩溃恢复 | 主从复制、数据备份 |
+| **记录内容** | 物理日志（数据页变化） | 逻辑日志（SQL语句） |
+| **写入方式** | 循环写入（固定大小） | 追加写入 |
+| **刷盘时机** | innodb_flush_log_at_trx_commit | sync_binlog |
+
 #### 刷盘策略
 
 ```ini
