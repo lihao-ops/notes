@@ -2147,11 +2147,17 @@ CREATE TABLE account (
 
 ---
 
+
+
 ### 5.3 ReadView 机制
+
+
 
 #### ReadView 是什么？
 
 事务开始时，InnoDB 会生成一个 **ReadView（读视图）**，记录当前活跃的事务列表，用于判断数据的可见性。
+
+
 
 #### ReadView 字段
 
@@ -2163,6 +2169,8 @@ class ReadView {
     long m_creator_trx_id;   // 创建该ReadView的事务ID
 }
 ```
+
+
 
 #### 可见性判断规则
 
