@@ -1350,6 +1350,14 @@ updateBalance(conn, 1L, new BigDecimal("900.00"));
 
 
 
+##### 1.WAL()
+
+
+
+
+
+
+
 #### 核心规则
 
 > 数据修改**必须先写日志（redo log）**，成功后才算 commit，
