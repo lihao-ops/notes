@@ -1434,6 +1434,37 @@ flush redo log 到磁盘（fsync）
 
 
 
+##### 5.Checkpoint：推进 redo log 的回收点
+
+>Redo log是循环写入的，所以必须不断推进
+
+```nginx
+checkpoint_lsn
+```
+
+- 把脏页刷回磁盘
+- 把redo log中已不需要重做的部分标记可覆盖。
+
+否则 redo log 会被写满。
+
+
+
+
+
+
+
+#### 高并发真实流程
+
+> 假设用户执行了
+
+```sql
+update account set balance = balance + 100 where id = 1;
+```
+
+1. 
+
+
+
 
 
 
