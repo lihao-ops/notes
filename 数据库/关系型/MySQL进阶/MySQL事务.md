@@ -2439,6 +2439,75 @@ MySQL提供了多种类型，通常分为以下几类：**表级锁、行级锁�
 
 
 
+示例代码
+
+```java
+    /**
+     * 场景1：写冲突 - 展示为什么需要行锁
+     * <p>
+     * 实现思路：
+     * 1. 两个线程同时读取同一账户余额
+     * 2. 都在原余额基础上增加100
+     * 3. 不使用锁的情况下会发生写冲突
+     * <p>
+     * 预期现象：
+     * - 线程1读取余额1000，计算后更新为1100
+     * - 线程2也读取余额1000，计算后更新为1100
+     * - 最终余额是1100而不是1200（丢失更新）
+     * <p>
+     * 实际现象：
+     * - MVCC只能保证读的一致性，无法防止写冲突
+     * - 最后一个提交的事务会覆盖前面的修改
+     */
+    @Test
+    public void testWriteConflict_NoLock() throws InterruptedException {
+        log.info("========== 场景1：写冲突（无锁） ==========");
+
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        // 线程1：增加100
+        executor.submit(() -> {
+            try {
+                startLatch.await(); // 等待同时启动
+                updateBalanceWithoutLock("ACC001", new BigDecimal("100"), "线程1");
+            } catch (Exception e) {
+                log.error("线程1异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        // 线程2：增加100
+        executor.submit(() -> {
+            try {
+                startLatch.await(); // 等待同时启动
+                updateBalanceWithoutLock("ACC001", new BigDecimal("100"), "线程2");
+            } catch (Exception e) {
+                log.error("线程2异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        Thread.sleep(100); // 确保两个线程都准备好
+        startLatch.countDown(); // 同时启动
+        endLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // 查看最终结果
+        Account finalAccount = accountRepository.findByAccountNo("ACC001").orElseThrow();
+        log.info("========== 最终余额: {} (预期1200，实际可能是1100) ==========", finalAccount.getBalance());
+    }
+```
+
+
+
+
+
+
+
 ##### 死锁
 
 > 什么是死锁？
