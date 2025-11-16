@@ -2498,7 +2498,19 @@ MySQL提供了多种类型，通常分为以下几类：**表级锁、行级锁�
 
         // 查看最终结果
         Account finalAccount = accountRepository.findByAccountNo("ACC001").orElseThrow();
-        log.info("========== 最终余额: {} (预期1200，实际可能是1100) ==========", finalAccount.getBalance());
+        log.info("========== 最终余额: {} (预期1200，实际可能是1100),当结果是1100表示其中一个+100被覆盖! ==========", finalAccount.getBalance());
+        BigDecimal expectedBalance = new BigDecimal("1200");
+        BigDecimal actualBalance = finalAccount.getBalance();
+
+        log.info("========== 最终余额: {} (预期1200，实际: {}) ==========", expectedBalance, actualBalance);
+        // 判断是否发生了写冲突
+        if (expectedBalance.compareTo(actualBalance) == 0) {
+            log.info("========== 测试通过：余额正确，无写冲突 ==========");
+        } else {
+            log.error("========== 测试失败：余额错误，发生了写冲突！实际余额: {} ==========", actualBalance);
+        }
+        // 使用断言判断结果
+        assertEquals(expectedBalance, actualBalance, "余额不符，发生了写冲突！");
     }
 ```
 
