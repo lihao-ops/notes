@@ -2588,12 +2588,21 @@ InnoDB 锁机制
 │   ├── 记录锁 (Record Lock)
 │   ├── 间隙锁 (Gap Lock)
 │   └── 临键锁 (Next-Key Lock)
+|   └── 排他锁 (    SELECT `id` FROM `account_lock` WHERE `account_no` = ? FOR UPDATE;        
 │
 └── 全局锁
     └── FTWRL (Flush Tables With Read Lock)
 ```
 
 ### 6.2 行锁详解
+
+
+
+
+
+
+
+
 
 #### 记录锁 (Record Lock)
 
