@@ -2664,8 +2664,22 @@ FOR UPDATE;
 ```java
     /**
      * 场景2：使用排他锁(X锁)解决写冲突
+     * 使用TransactionTemplate确保事务生效
      * <p>
-     * 核心修复：使用TransactionTemplate确保事务生效
+     * 实现思路：
+     * 1. 使用SELECT ... FOR UPDATE加排他锁
+     * 2. 第一个事务获取锁后，第二个事务必须等待
+     * 3. 保证串行化执行，避免写冲突
+     * <p>
+     * 预期现象：
+     * - 线程1获取排他锁，读取余额1000，更新为1100
+     * - 线程2等待锁释放，读取余额1100，更新为1200
+     * - 最终余额正确：1200
+     * <p>
+     * 实际现象：
+     * - 线程2会阻塞在SELECT ... FOR UPDATE
+     * - 等待线程1提交事务后才能继续
+     * - 成功防止了写冲突
      */
     @Test
     public void testWriteConflict_WithExclusiveLock() throws InterruptedException {
