@@ -2602,16 +2602,24 @@ InnoDB 锁机制
 │   │      示例：SELECT * FROM account_lock WHERE account_no = 'A050' FOR UPDATE;
 │   │             → 锁住记录本身 + 左/右两个间隙
 │   │
-│   └── 排他锁 (Exclusive Lock / X Lock)
+│   ├── 排他锁 (Exclusive Lock / X Lock)
+│   │      示例：SELECT id, account_no 
+│   │              FROM account_lock 
+│   │             WHERE account_no = ? 
+│   │               FOR UPDATE;
+│   │             → 当前行加 X 锁（写锁），其他事务无法读/写
+│   │
+│   └── 共享锁 (Shared Lock / S Lock)
 │          示例：SELECT id, account_no 
 │                  FROM account_lock 
 │                 WHERE account_no = ? 
-│                   FOR UPDATE;
-│                 → 当前行加 X 锁（写锁），其他事务无法读/写
+│                   LOCK IN SHARE MODE;
+│                 → 当前行加 S 锁，其他事务可以读但无法修改
 │
 └── 全局锁（Global Locks）
     └── FTWRL (Flush Tables With Read Lock)
            示例：FLUSH TABLES WITH READ LOCK;
+
 ```
 
 ### 6.2 行锁详解
@@ -2745,6 +2753,24 @@ FOR UPDATE;
 - 它通过在事务中锁定某一行数据，确保在事务提交前没有其他事务能够修改这行数据，
 - 从而**有效避免写冲突和丢失更新等问题**。
 - 排他锁保证了事务的 **隔离性** 和 **一致性**，是并发控制的重要手段之一。
+
+
+
+
+
+
+
+#### 共享锁 (Shared Lock / S Lock)
+
+
+
+##### 1.什么是共享锁？
+
+
+
+
+
+
 
 
 
