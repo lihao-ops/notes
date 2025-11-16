@@ -2630,9 +2630,107 @@ InnoDB 锁机制
 
 1. **独占性**：当一个事务对某一行加上排他锁时，其它事务不能对该行进行`读取`或`修改`，直到事务提交或回滚。
 2. **阻塞**：**其它事务在试图访问已加排它锁的行时，会被阻塞**，直到持有排它锁的事务完成并释放锁。
-3. **防止写冲突**：排它锁通常用于防止`丢失更新`
+3. **防止写冲突**：排它锁通常用于防止`丢失更新(Lost Update)`和`写冲突`，**确保并发访问时，只有一个事务能够修改某一行数据**。
 
 
+
+##### 3.常见应用
+
+**事务更新时加锁**：当一个事务需要修改某一行数据时，通常会对该行加上排他锁，以**确保在事务执行期间，没有其他事务可以修改这行数据**。
+
+**数据一致性**：**排他锁是保证数据一致性的一种机制**，特别是对于需要修改数据库数据的操作（例如：`UPDATE`），可以**通过排他锁避免并发修改导致的数据错误**。
+
+
+
+##### 3.sql示例
+
+假设我们有一个名为 `account_lock` 的表，表示银行账户的余额。以下是使用排他锁的 SQL 示例：
+
+```sql
+SELECT id, account_no, balance
+FROM account_lock
+WHERE account_no = 'ACC001'
+FOR UPDATE;
+```
+
+**`FOR UPDATE`**：这是排他锁的关键字，它会锁定查询结果的行，防止其他事务在当前事务提交之前对这些行进行修改或读取。
+
+在这个示例中，**`account_no = 'ACC001'`** 的记录会被加上排他锁，其他事务不能对其进行修改，直到当前事务完成。
+
+
+
+##### 4.实践代码
+
+```java
+    /**
+     * 场景2：使用排他锁(X锁)解决写冲突
+     * <p>
+     * 核心修复：使用TransactionTemplate确保事务生效
+     */
+    @Test
+    public void testWriteConflict_WithExclusiveLock() throws InterruptedException {
+        log.info("========== 场景2：使用排他锁解决写冲突 ==========");
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                transactionTemplate.execute(status -> {
+                    updateBalanceWithExclusiveLock("ACC001", new BigDecimal("100"), "线程1");
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("线程1异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                Thread.sleep(10);
+                transactionTemplate.execute(status -> {
+                    updateBalanceWithExclusiveLock("ACC001", new BigDecimal("100"), "线程2");
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("线程2异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+        startLatch.countDown();
+        endLatch.await(15, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // 等待事务完全提交
+        Thread.sleep(200);
+        Account finalAccount = accountRepository.findByAccountNo("ACC001").orElseThrow();
+        BigDecimal actualBalance = finalAccount.getBalance();
+        BigDecimal expectedBalance = new BigDecimal("1200.00");
+
+        log.info("========== 最终余额: {} (预期: {}) ==========", actualBalance, expectedBalance);
+        // 断言：使用排他锁后，余额应该正确为1200
+        assertEquals(
+                0,
+                expectedBalance.compareTo(actualBalance),
+                String.format("使用排他锁后余额应该正确，预期: %s, 实际: %s", expectedBalance, actualBalance)
+        );
+        log.info("========== ✓ 测试通过：排他锁成功防止写冲突 ==========");
+    }
+```
+
+
+
+
+
+##### 5.总结
+
+- 排他锁是 **行级锁** 的一种，
+- 它通过在事务中锁定某一行数据，确保在事务提交前没有其他事务能够修改这行数据，
+- 从而**有效避免写冲突和丢失更新等问题**。
+- 排他锁保证了事务的 **隔离性** 和 **一致性**，是并发控制的重要手段之一。
 
 
 
