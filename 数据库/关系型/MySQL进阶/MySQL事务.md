@@ -2583,18 +2583,18 @@ InnoDB 锁机制
 │   ├── 表锁 (LOCK TABLES)
 │   │      示例：LOCK TABLES account_lock WRITE;
 │   │
-│   ├── 元数据锁 MDL (Meta Data Lock)
+│   ├── 元数据锁* MDL (Meta Data Lock)
 │   │      示例：ALTER TABLE account_lock ADD COLUMN remark VARCHAR(50);
 │   │
-│   └── 意向锁 IS / IX (Intention Locks)
+│   └── 意向锁* IS / IX (Intention Locks)
 │          示例：SELECT * FROM account_lock WHERE id = 1 FOR UPDATE;
 │                 → 自动加 IX（意向排他锁）
 │
 ├── 行级锁（Row Locks）
-│   ├── 记录锁 (Record Lock)
+│   ├── 记录锁* (Record Lock)
 │   │      示例：SELECT * FROM account_lock WHERE id = 10 FOR UPDATE;
 │   │
-│   ├── 间隙锁 (Gap Lock)
+│   ├── 间隙锁* (Gap Lock)
 │   │      示例：SELECT * FROM account_lock WHERE account_no > 'A001' AND account_no < 'A100' FOR UPDATE;
 │   │             → 阻止插入 A001 ~ A100 之间的新记录
 │   │
@@ -2602,7 +2602,7 @@ InnoDB 锁机制
 │   │      示例：SELECT * FROM account_lock WHERE account_no = 'A050' FOR UPDATE;
 │   │             → 锁住记录本身 + 左/右两个间隙
 │   │
-│   ├── 排他锁 (Exclusive Lock / X Lock)
+│   ├── 排他锁* (Exclusive Lock / X Lock)
 │   │      示例：SELECT id, account_no 
 │   │              FROM account_lock 
 │   │             WHERE account_no = ? 
@@ -2621,6 +2621,14 @@ InnoDB 锁机制
            示例：FLUSH TABLES WITH READ LOCK;
 
 ```
+
+- **行级锁**（尤其是 **排他锁**）是数据库并发控制的关键，能够有效避免写冲突，是最重要的锁类型之一，适用于大多数需要数据一致性的场景。
+- **共享锁** 适用于 **只读** 场景，避免读操作时的数据被其他事务修改，但它不允许写操作，因此在需要高并发读写的场景下，**排他锁** 和 **MVCC**（多版本并发控制）更为合适。
+- 对于 **批量更新** 或 **表结构变更**，可以使用 **表锁** 或 **元数据锁** 来避免冲突。
+
+掌握这些锁的使用场景和特点能帮助你在实际开发中做出性能优化，避免并发冲突，保证数据的一致性和完整性。
+
+
 
 ### 6.2 行锁详解
 
@@ -2815,6 +2823,10 @@ LOCK IN SHARE MODE;
 **共享锁** 允许多个事务同时读取某一行数据，但**禁止其他事务对该行数据进行修改（写操作）**。这保证了数据在事务期间的一致性，即使多个事务并发读取同一数据，它们也能保证不会发生写冲突。
 
 
+
+
+
+# 书签
 
 
 
