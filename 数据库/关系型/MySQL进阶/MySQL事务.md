@@ -2579,22 +2579,52 @@ MVCC主要解决了读操作的一致性问题，但在多事务并发修改数�
 
 ```
 InnoDB 锁机制
-├── 表级锁
+├── 表级锁（Table Locks）
 │   ├── 表锁 (LOCK TABLES)
-│   ├── 元数据锁 (MDL)
-│   └── 意向锁 (IS/IX)
+│   │      示例：LOCK TABLES account_lock WRITE;
+│   │
+│   ├── 元数据锁 MDL (Meta Data Lock)
+│   │      示例：ALTER TABLE account_lock ADD COLUMN remark VARCHAR(50);
+│   │
+│   └── 意向锁 IS / IX (Intention Locks)
+│          示例：SELECT * FROM account_lock WHERE id = 1 FOR UPDATE;
+│                 → 自动加 IX（意向排他锁）
 │
-├── 行级锁
+├── 行级锁（Row Locks）
 │   ├── 记录锁 (Record Lock)
+│   │      示例：SELECT * FROM account_lock WHERE id = 10 FOR UPDATE;
+│   │
 │   ├── 间隙锁 (Gap Lock)
-│   └── 临键锁 (Next-Key Lock)
-|   └── 排他锁 (    SELECT `id` FROM `account_lock` WHERE `account_no` = ? FOR UPDATE;        
+│   │      示例：SELECT * FROM account_lock WHERE account_no > 'A001' AND account_no < 'A100' FOR UPDATE;
+│   │             → 阻止插入 A001 ~ A100 之间的新记录
+│   │
+│   ├── 临键锁 (Next-Key Lock)
+│   │      示例：SELECT * FROM account_lock WHERE account_no = 'A050' FOR UPDATE;
+│   │             → 锁住记录本身 + 左/右两个间隙
+│   │
+│   └── 排他锁 (Exclusive Lock / X Lock)
+│          示例：SELECT id, account_no 
+│                  FROM account_lock 
+│                 WHERE account_no = ? 
+│                   FOR UPDATE;
+│                 → 当前行加 X 锁（写锁），其他事务无法读/写
 │
-└── 全局锁
+└── 全局锁（Global Locks）
     └── FTWRL (Flush Tables With Read Lock)
+           示例：FLUSH TABLES WITH READ LOCK;
 ```
 
 ### 6.2 行锁详解
+
+
+
+#### 排它锁(Exclusive Lock / X Lock)
+
+​	**排他锁**（**Exclusive Lock**，简称 **X Lock**）是数据库中的一种锁类型，通常用于行级锁，**确保在某个事务对数据行进行修改时，其他事务无法访问或修改该行数据**。换句话说，排他锁是用于实现数据的 **独占访问**。
+
+
+
+
 
 
 
