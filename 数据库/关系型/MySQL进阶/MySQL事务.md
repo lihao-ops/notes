@@ -2470,8 +2470,11 @@ MySQL提供了多种类型，通常分为以下几类：**表级锁、行级锁�
         // 线程1：增加100
         executor.submit(() -> {
             try {
-                startLatch.await(); // 等待同时启动
-                updateBalanceWithoutLock("ACC001", new BigDecimal("100"), "线程1");
+                startLatch.await();
+                transactionTemplate.execute(status -> {
+                    updateBalanceWithoutLock("ACC001", new BigDecimal("100"), "线程1");
+                    return null;
+                });
             } catch (Exception e) {
                 log.error("线程1异常", e);
             } finally {
@@ -2482,8 +2485,11 @@ MySQL提供了多种类型，通常分为以下几类：**表级锁、行级锁�
         // 线程2：增加100
         executor.submit(() -> {
             try {
-                startLatch.await(); // 等待同时启动
-                updateBalanceWithoutLock("ACC001", new BigDecimal("100"), "线程2");
+                startLatch.await();
+                transactionTemplate.execute(status -> {
+                    updateBalanceWithoutLock("ACC001", new BigDecimal("100"), "线程2");
+                    return null;
+                });
             } catch (Exception e) {
                 log.error("线程2异常", e);
             } finally {
@@ -2491,26 +2497,33 @@ MySQL提供了多种类型，通常分为以下几类：**表级锁、行级锁�
             }
         });
 
-        Thread.sleep(100); // 确保两个线程都准备好
-        startLatch.countDown(); // 同时启动
+        Thread.sleep(100);
+        startLatch.countDown();
         endLatch.await(10, TimeUnit.SECONDS);
         executor.shutdown();
 
+        // 等待事务完全提交
+        Thread.sleep(200);
+
         // 查看最终结果
         Account finalAccount = accountRepository.findByAccountNo("ACC001").orElseThrow();
-        log.info("========== 最终余额: {} (预期1200，实际可能是1100),当结果是1100表示其中一个+100被覆盖! ==========", finalAccount.getBalance());
-        BigDecimal expectedBalance = new BigDecimal("1200");
         BigDecimal actualBalance = finalAccount.getBalance();
 
-        log.info("========== 最终余额: {} (预期1200，实际: {}) ==========", expectedBalance, actualBalance);
-        // 判断是否发生了写冲突
-        if (expectedBalance.compareTo(actualBalance) == 0) {
-            log.info("========== 测试通过：余额正确，无写冲突 ==========");
+        log.info("========== 最终余额: {} ==========", actualBalance);
+
+        // 断言：由于写冲突，余额应该是1100（丢失了一次更新）
+        // 注意：在某些情况下可能是1200（如果运气好没有冲突），但大概率是1100
+        assertTrue(
+                actualBalance.compareTo(new BigDecimal("1100.00")) == 0 ||
+                        actualBalance.compareTo(new BigDecimal("1200.00")) == 0,
+                "余额应该是1100（发生写冲突）或1200（未发生冲突）"
+        );
+
+        if (actualBalance.compareTo(new BigDecimal("1100.00")) == 0) {
+            log.warn("========== ⚠️ 发生写冲突！一次更新被覆盖，余额: {} ==========", actualBalance);
         } else {
-            log.error("========== 测试失败：余额错误，发生了写冲突！实际余额: {} ==========", actualBalance);
+            log.info("========== ✓ 未发生写冲突，余额: {} ==========", actualBalance);
         }
-        // 使用断言判断结果
-        assertEquals(expectedBalance, actualBalance, "余额不符，发生了写冲突！");
     }
 ```
 
@@ -2519,8 +2532,6 @@ MySQL提供了多种类型，通常分为以下几类：**表级锁、行级锁�
 - **MVCC只保证读的一致性（每个事务看到自己的快照）**
 - **无法防止"丢失更新"问题**
 - **最后提交的事务会覆盖之前的修改**
-
-
 
 
 
