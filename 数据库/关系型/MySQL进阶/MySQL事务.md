@@ -3378,6 +3378,133 @@ SELECT * FROM account WHERE id <= 7 FOR UPDATE;
 (5, 10)  -- Gap Lock
 ```
 
+
+
+
+
+##### 3.实践代码
+
+```java
+    /**
+     * 场景9：临键锁（Next-Key Lock）验证
+     * <p>
+     * 测试目的：
+     * - 验证范围查询 + FOR UPDATE 会产生 next-key lock（记录锁 + 间隙锁）
+     * - 阻塞范围内的 INSERT
+     * <p>
+     * 实验逻辑：
+     * 1. 线程1：执行 SELECT * FROM account WHERE balance BETWEEN 500 AND 3000 FOR UPDATE
+     * → 锁定范围 (500, 3000] 的 next-key lock
+     * 2. 线程2：尝试插入 balance=1000 的新记录 ACC999
+     * → 必须被阻塞（因为属于 next-key lock 范围）
+     * <p>
+     * Next-Key Lock（记录锁 + 前开后闭间隙锁）
+     * 锁住的真实范围是：
+     * (500, 1000]
+     * (1000, 2000]
+     * (2000, 3000]
+     * <p>
+     * 你插入的数据：
+     * balance = 1000  → 落在第二个 next-key 区间
+     * 所以 INSERT 必须等待：
+     * ➡️ 完全符合 InnoDB 的锁规则
+     * ➡️ 说明你的测试是“正确复现数据库内部机制”级别的
+     * 预期：
+     * - 插入被阻塞超过 1 秒
+     */
+    @Test
+    public void testNextKeyLock() throws InterruptedException {
+        log.info("========== 场景9：临键锁（Next-Key Lock）验证 ==========");
+
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        AtomicBoolean insertBlocked = new AtomicBoolean(false);
+        AtomicLong wait = new AtomicLong(0);
+
+        // 线程1：范围锁（产生 next-key lock）
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                transactionTemplate.execute(status -> {
+                    log.info("[线程1] 执行范围锁 SELECT ... FOR UPDATE");
+                    entityManager.createQuery(
+                                    "SELECT a FROM Account a WHERE a.balance BETWEEN 500 AND 3000",
+                                    Account.class)
+                            .setLockMode(LockModeType.PESSIMISTIC_WRITE)
+                            .getResultList();
+
+                    try {
+                        Thread.sleep(3000); // 故意持锁
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("线程1异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        // 线程2：尝试插入（必须被 next-key lock 阻塞）
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                Thread.sleep(100);
+
+                long start = System.currentTimeMillis();
+                try {
+                    transactionTemplate.execute(status -> {
+                        log.info("[线程2] 尝试插入 ACC999(balance=1000)");
+                        Account acc = new Account();
+                        acc.setAccountNo("ACC999");
+                        acc.setBalance(new BigDecimal("1000"));
+                        accountRepository.save(acc);
+                        return null;
+                    });
+                } catch (Exception e) {
+                    insertBlocked.set(true);
+                }
+
+                wait.set(System.currentTimeMillis() - start);
+            } catch (Exception e) {
+                log.error("线程2异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        startLatch.countDown();
+        endLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        log.info("[线程2] 插入等待时长：{} ms", wait.get());
+
+        assertTrue(wait.get() > 2000,
+                "临键锁应该阻塞插入（INSERT 必须等待范围锁释放）");
+
+        log.info("========== ✓ 测试通过：Next-Key Lock 阻塞范围内插入 ==========");
+    }
+```
+
+
+
+```bash
+[线程2] 插入等待时长：2923 ms
+========== ✓ 测试通过：Next-Key Lock 阻塞范围内插入 ==========
+```
+
+
+
+
+
+
+
+
+
 ---
 
 ### 6.3 意向锁 (Intention Lock)
