@@ -3287,6 +3287,115 @@ INSERT INTO account (id, balance) VALUES (11, 1000); -- 立即执行 ✅
 
 **作用**: 防止幻读（防止在范围内插入新记录）
 
+
+
+
+
+##### 5.实践代码
+
+```java
+    /**
+     * 场景5：幻读与间隙锁
+     * <p>
+     * 实现思路：
+     * 1. 事务1：查询余额 > 500的账户（假设查到2条）
+     * 2. 事务2：插入一条余额600的新账户
+     * 3. 事务1：再次查询，如果查到3条就是幻读
+     * 4. 使用间隙锁防止幻读
+     * <p>
+     * 预期现象（READ_COMMITTED）：
+     * - 第一次查询：2条记录
+     * - 事务2插入成功
+     * - 第二次查询：3条记录（幻读）
+     * <p>
+     * 预期现象（REPEATABLE_READ + 间隙锁）：
+     * - 第一次查询：2条记录
+     * - 事务2插入被阻塞
+     * - 第二次查询：仍是2条记录（无幻读）
+     */
+    @Test
+    public void testPhantomRead() throws InterruptedException {
+        log.info("========== 场景5：幻读场景 ==========");
+
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        AtomicInteger firstQueryCount = new AtomicInteger(0);
+        AtomicInteger secondQueryCount = new AtomicInteger(0);
+        AtomicBoolean insertBlocked = new AtomicBoolean(false);
+
+        // 线程1：执行范围查询
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                transactionTemplate.execute(status -> {
+                    int[] counts = rangeQueryWithGapLock("线程1-查询");
+                    firstQueryCount.set(counts[0]);
+                    secondQueryCount.set(counts[1]);
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("线程1异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        // 线程2：尝试插入
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                Thread.sleep(500);
+                long startTime = System.currentTimeMillis();
+                transactionTemplate.execute(status -> {
+                    insertNewAccount("线程2-插入");
+                    long waitTime = System.currentTimeMillis() - startTime;
+                    if (waitTime > 2000) {
+                        insertBlocked.set(true);
+                    }
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("线程2异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        startLatch.countDown();
+        endLatch.await(15, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        // 断言验证
+        assertEquals(2, firstQueryCount.get(), "第一次查询应该查到2条记录");
+        assertEquals(2, secondQueryCount.get(), "第二次查询应该仍然是2条记录（间隙锁防止插入）");
+        assertTrue(insertBlocked.get(), "插入操作应该被间隙锁阻塞");
+
+        log.info("========== ✓ 测试通过：间隙锁成功防止幻读 ==========");
+    }
+```
+
+
+
+```jade
+[线程1-查询] - 查询到: ACC001, 余额: 1000.00
+[线程1-查询] - 查询到: ACC002, 余额: 2000.00
+[线程1-查询] 查询完成，释放间隙锁
+
+[线程2-插入] ✓ 插入成功 (等待了2523ms)
+
+========== ✓ 测试通过：间隙锁成功防止幻读 ==========
+```
+
+
+
+
+
+
+
+
+
 ---
 
 
@@ -3497,7 +3606,15 @@ SELECT * FROM account WHERE id <= 7 FOR UPDATE;
 ========== ✓ 测试通过：Next-Key Lock 阻塞范围内插入 ==========
 ```
 
+> ✅ **(500, 3000] 是前开后闭区间**
 
+| 插入值      | 是否被锁                   | 原因                                       |
+| ----------- | -------------------------- | ------------------------------------------ |
+| **500**     | **允许插入（不会被阻塞）** | 因为 500 位于开区间左端，不属于 (500,3000] |
+| **500.01**  | 被阻塞                     | 属于区间内部                               |
+| **1000**    | 被阻塞                     | 属于 (500,3000]                            |
+| **3000**    | 被阻塞                     | 因为右边是闭区间 "3000]"                   |
+| **3000.01** | 不阻塞                     | 不在锁范围内                               |
 
 
 
