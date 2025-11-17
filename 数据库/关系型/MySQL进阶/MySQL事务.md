@@ -2671,9 +2671,9 @@ InnoDB 中的锁粒度包括：
 
 
 
-
-
 #### 排它锁(Exclusive Lock / X Lock)
+
+
 
 ##### 1.什么是排它锁？
 
