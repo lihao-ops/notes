@@ -2816,7 +2816,127 @@ LOCK IN SHARE MODE;
 
 
 
-##### 5.总结
+##### 实践代码
+
+```java
+    /**
+     * 场景3：共享锁(S锁) 与 排他锁(X锁) 的兼容性验证
+     *
+     * 测试目的：
+     * 验证 InnoDB 中 S 锁允许并发读取，而 X 锁必须等待所有 S 锁释放后才能获得。
+     *
+     * 实现思路：
+     * 1. 线程1 获取共享锁（SELECT ... LOCK IN SHARE MODE），持锁 2000ms
+     * 2. 线程2 获取共享锁，持锁 1000ms —— 可与线程1并发（读读不冲突）
+     * 3. 线程3 尝试获取排他锁（SELECT ... FOR UPDATE）
+     *    → 预期：必须等待线程1、线程2 的共享锁全部释放后才能继续执行
+     *
+     * 预期现象（锁兼容矩阵验证）：
+     * - S 与 S 兼容：线程1 与 线程2 可以同时读取
+     * - S 与 X 不兼容：线程3 的排他锁必须等待所有共享锁释放
+     *
+     * 实际现象（通过阻塞时间验证）：
+     * - 线程1、线程2 均成功立即获取共享锁
+     * - 线程3 在执行 FOR UPDATE 语句时阻塞约 ~1500ms（因 S 锁未释放）
+     * - 待线程1、线程2 都释放共享锁后，线程3 才继续执行
+     *
+     * 结论：
+     * ✔ 共享锁允许并发读取（读读并发）
+     * ✔ 排他锁必须等待共享锁释放（读写互斥）
+     * 该测试准确反映了 InnoDB 的锁兼容性行为。
+     */
+    @Test
+    public void testSharedLockVsExclusiveLock() throws InterruptedException {
+        log.info("========== 场景3：共享锁与排他锁的兼容性 ==========");
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(3);
+        ExecutorService executor = Executors.newFixedThreadPool(3);
+        AtomicBoolean thread1Success = new AtomicBoolean(false);
+        AtomicBoolean thread2Success = new AtomicBoolean(false);
+
+        // 线程1：持有共享锁
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                transactionTemplate.execute(status -> {
+                    holdSharedLock("ACC001", "线程1-共享锁", 2000);
+                    thread1Success.set(true);
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("线程1异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        // 线程2：也获取共享锁
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                Thread.sleep(200);
+                transactionTemplate.execute(status -> {
+                    holdSharedLock("ACC001", "线程2-共享锁", 1000);
+                    thread2Success.set(true);
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("线程2异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        // 线程3：尝试获取排他锁
+        AtomicBoolean beforeQuery = new AtomicBoolean(false);
+        AtomicBoolean afterQuery = new AtomicBoolean(false);
+        AtomicLong waitTime = new AtomicLong(0);
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                Thread.sleep(400);
+                transactionTemplate.execute(status -> {
+                    long start = System.currentTimeMillis();
+                    beforeQuery.set(true);
+                    accountRepository.findByAccountNoWithExclusiveLock("ACC001").orElseThrow();
+                    waitTime.set(System.currentTimeMillis() - start);
+                    afterQuery.set(true);
+
+                    return null;
+                });
+
+            } catch (Exception e) {
+                log.error("线程3异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+        startLatch.countDown();
+        endLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+        // 断言验证
+        // 断言验证：基础行为
+        assertTrue(thread1Success.get(), "线程1应该成功获取共享锁");
+        assertTrue(thread2Success.get(), "线程2应该成功获取共享锁（共享锁可以并存）");
+        // 线程3：尝试获取排他锁的动作必须发生
+        assertTrue(beforeQuery.get(), "线程3应该开始尝试获取排他锁");
+        // 线程3：最终一定能执行成功（说明等待后成功加锁）
+        assertTrue(afterQuery.get(), "线程3应该在共享锁释放后成功获取排他锁并继续执行");
+        // 阻塞时间范围验证（关键逻辑）
+        long wt = waitTime.get();
+        // 理论阻塞约等于：2000ms - 400ms = 1600ms
+        assertTrue(wt >= 1400 && wt <= 3000, String.format("线程3阻塞时间异常：%d ms，应在 1400~3000ms 区间（1400ms以上说明确实被共享锁阻塞）", wt)
+        );
+        log.info("线程3实际阻塞时长: {} ms", wt);
+        log.info("========== ✓ 测试通过：共享锁并发正常，排他锁等待共享锁释放 ==========");
+    }
+```
+
+
+
+
+
+##### 6.总结
 
 共享锁是一种 **只读** 锁，它允许多个事务并发读取数据，但**不允许数据的修改**，常用于确保数据一致性和避免脏读等问题。
 
@@ -2826,7 +2946,7 @@ LOCK IN SHARE MODE;
 
 
 
-# 书签
+
 
 
 
