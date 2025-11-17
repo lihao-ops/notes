@@ -3745,7 +3745,7 @@ LOCK TABLE user WRITE;
 
 
 
-#### 作用：快速判断表级锁是否可获得
+#### 5.作用：快速判断表级锁是否可获得
 
 协调行锁与表锁的关系，提高加表锁的效率。
 
@@ -3762,7 +3762,106 @@ LOCK TABLE user WRITE;
 
 
 
----
+#### 6.实践代码
+
+```java
+    /**
+     * 场景10：意向锁（IS共享锁 / IX排它锁）验证
+     *
+     * 测试目的：
+     *  - 行锁（FOR UPDATE）会自动在表上加 IX 锁
+     *  - 此时任何表级写锁（LOCK TABLES WRITE）都会被阻塞
+     *  - 行锁释放后，表写锁立即获取
+     *
+     * 实验设计：
+     *  1. 线程1：对 ACC001 加行锁（FOR UPDATE）→ 表自动加 IX排它锁
+     *  2. 线程2：尝试加表写锁（LOCK TABLES account WRITE）→ 必须等待
+     *
+     * 预期：
+     *  - 表锁等待时间 > 1000ms
+     */
+    @Test
+    public void testIntentLock() throws InterruptedException {
+        log.info("========== 场景10：意向锁（IS / IX）验证 ==========");
+
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        AtomicLong wait = new AtomicLong(0);
+
+        // 线程1：加行锁（FOR UPDATE）
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+
+                transactionTemplate.execute(status -> {
+                    log.info("[线程1] 获取 ACC001 行锁（FOR UPDATE）...");
+                    holdExclusiveLock("ACC001", "线程1");
+
+                    try { Thread.sleep(3000); } catch (InterruptedException ignored) {}
+
+                    return null;
+                });
+
+            } catch (Exception e) {
+                log.error("线程1异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        // 线程2：尝试加表写锁（应该被阻塞）
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                Thread.sleep(200);
+
+                long start = System.currentTimeMillis();
+                transactionTemplate.execute(status -> {
+                    log.info("[线程2] 尝试获取表写锁 LOCK TABLES WRITE...");
+                    accountRepository.lockTableWrite(); // 新增方法
+                    return null;
+                });
+                wait.set(System.currentTimeMillis() - start);
+
+            } catch (Exception e) {
+                log.error("线程2异常", e);
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        startLatch.countDown();
+        endLatch.await(15, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        log.info("[线程2] 表锁等待时长：{} ms", wait.get());
+
+        assertTrue(wait.get() > 2000,
+                "表写锁应该因意向锁而被阻塞（等待行锁释放）");
+
+        log.info("========== ✓ 测试通过：意向锁成功阻塞表锁 ==========");
+    }
+```
+
+```java
+[线程1] ✓ 成功获取排他锁 (等待了20ms)，余额: 1000.00
+[线程2] 尝试获取表写锁 LOCK TABLES WRITE...
+
+[线程1] 释放排他锁
+[线程2] 表锁等待时长：4336 ms
+
+========== ✓ 测试通过：意向锁成功阻塞表锁 ==========
+```
+
+
+
+
+
+
+
+
 
 ### 6.4 加锁示例
 
