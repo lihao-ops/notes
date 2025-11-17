@@ -2952,6 +2952,20 @@ LOCK IN SHARE MODE;
 
 #### 记录锁 (Record Lock)
 
+
+
+##### 1.什么是记录锁？
+
+​	**记录锁(Record Lock)**：是InnoDB在索引层面加的锁，**只锁"索引上的某一条记录"**。用于精确锁住某一行，**阻止别人修改/删除该行**。
+
+​	它是**行级锁(Row Lock)的最基本单位**。
+
+
+
+
+
+
+
 ```sql
 -- 会话A
 START TRANSACTION;
