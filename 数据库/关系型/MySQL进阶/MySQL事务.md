@@ -4649,7 +4649,27 @@ END OF INNODB MONITOR OUTPUT
 
 ---
 
-### 7.3 死锁预防策略
+
+
+### 7.3 
+
+
+
+
+
+
+
+
+
+
+
+
+
+---
+
+
+
+### 7.4 死锁预防策略
 
 #### 1. 按固定顺序加锁
 
@@ -4754,7 +4774,7 @@ private void updateOrderInTransaction(Long orderId, BigDecimal result) {
 
 ---
 
-### 7.4 事务调优实战
+### 7.5 事务调优实战
 
 #### 1. 查找长事务
 
