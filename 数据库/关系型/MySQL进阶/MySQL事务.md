@@ -4208,6 +4208,44 @@ graph TD
 
 ```
 
+###### 事务A 第一句 SQL
+
+```
+select * from account_lock where account_no = 'ACC002' for update;
+```
+
+→ 图中节点：`A锁一`
+
+------
+
+###### 事务B 第一句 SQL
+
+```
+select * from account_lock where account_no = 'ACC001' for update;
+```
+
+→ 图中节点：`B锁一`
+
+------
+
+###### 事务A 第二句 SQL（被阻塞）
+
+```
+select * from account_lock where account_no = 'ACC001' for update;
+```
+
+→ 图中节点：`A等二`
+
+------
+
+###### 事务B 第二句 SQL（被阻塞）
+
+```
+select * from account_lock where account_no = 'ACC002' for update;
+```
+
+→ 图中节点：`B等二`
+
 
 
 ##### 实际代码
@@ -4316,37 +4354,109 @@ SHOW ENGINE INNODB STATUS;
 ##### 2.输出关键部分
 
 ```sql
--- 输出示例（关键部分）
+# 死锁日志起始标识，用于确认最新一次死锁
 ------------------------
 LATEST DETECTED DEADLOCK
 ------------------------
-2024-11-11 10:30:00 0x7f8b9c001700
+
+# 死锁发生的时间戳
+2025-11-18 20:39:31 0x2f7c
+
+
+# ====================== 事务 (1) 信息 ======================
+# 事务(1) 的基本信息：事务ID、状态、时间
 *** (1) TRANSACTION:
-TRANSACTION 12345, ACTIVE 2 sec starting index read
-mysql tables in use 1, locked 1
-LOCK WAIT 2 lock struct(s), heap size 1136, 1 row lock(s)
-MySQL thread id 10, OS thread handle 140243567890432, query id 100 localhost root
-UPDATE account SET balance=500 WHERE id=2
+TRANSACTION 1172965, ACTIVE 1 sec starting index read
 
+# 使用的表数量，被锁的表数量（1张表）
+mysql tables in use 1, locked 1
+
+# 锁结构数量、锁内存大小、正在等待的行锁数量
+LOCK WAIT 4 lock struct(s), heap size 1128, 3 row lock(s)
+
+# 线程ID、查询编号，用于定位来源
+MySQL thread id 3780, OS thread handle 5168, query id 235096 localhost 127.0.0.1 root statistics
+
+# 事务(1) 正在执行的 SQL：想要锁 ACC001
+select a1_0.id,a1_0.account_no,a1_0.balance,a1_0.version 
+from account_lock a1_0 
+where a1_0.account_no='ACC001' for update
+
+
+# (1)当前已经持有的锁：持有 ACC002 行锁（记录锁，不含间隙）
+*** (1) HOLDS THE LOCK(S):
+RECORD LOCKS space id 242 page no 5 n bits 72 index account_no of table `transaction_study`.`account_lock` trx id 1172965 lock_mode X locks rec but not gap
+
+# 下面是 ACC002 的真实物理记录（heap no=6）
+Record lock, heap no 6 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 6; hex 414343303032; asc ACC002;;
+ 1: len 8; hex 8000000000000043; asc        C;;
+
+
+# (1)事务正在等待的锁：等待 ACC001（被事务2持有）
 *** (1) WAITING FOR THIS LOCK TO BE GRANTED:
-RECORD LOCKS space id 2 page no 3 n bits 72 index PRIMARY of table `test`.`account` 
-trx id 12345 lock_mode X locks rec but not gap waiting
+RECORD LOCKS space id 242 page no 5 n bits 72 index account_no of table `transaction_study`.`account_lock` trx id 1172965 lock_mode X locks rec but not gap waiting
 
+# 这是 ACC001 的物理记录（heap no=4）
+Record lock, heap no 4 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 6; hex 414343303031; asc ACC001;;
+ 1: len 8; hex 8000000000000042; asc        B;;
+
+
+
+# ====================== 事务 (2) 信息 ======================
+# 事务(2) 的基本信息
 *** (2) TRANSACTION:
-TRANSACTION 12346, ACTIVE 1 sec starting index read
+TRANSACTION 1172964, ACTIVE 1 sec starting index read
+
+# 使用的表数量，被锁表数量
 mysql tables in use 1, locked 1
-2 lock struct(s), heap size 1136, 1 row lock(s)
-MySQL thread id 11, OS thread handle 140243567894528, query id 101 localhost root
-UPDATE account SET balance=500 WHERE id=1
 
+# 锁结构、锁内存等
+LOCK WAIT 4 lock struct(s), heap size 1128, 3 row lock(s)
+
+# 线程信息
+MySQL thread id 3779, OS thread handle 29436, query id 235097 localhost 127.0.0.1 root statistics
+
+# 事务(2) 正在执行 SQL：试图锁 ACC002
+select a1_0.id,a1_0.account_no,a1_0.balance,a1_0.version 
+from account_lock a1_0 
+where a1_0.account_no='ACC002' for update
+
+
+# (2) 持有的锁：ACC001（与事务1互锁）
 *** (2) HOLDS THE LOCK(S):
-RECORD LOCKS space id 2 page no 3 n bits 72 index PRIMARY of table `test`.`account`
-trx id 12346 lock_mode X locks rec but not gap
+RECORD LOCKS space id 242 page no 5 n bits 72 index account_no of table `transaction_study`.`account_lock` trx id 1172964 lock_mode X locks rec but not gap
 
-*** WE ROLL BACK TRANSACTION (1)
+# 这是 ACC001 的记录（事务2持有）
+Record lock, heap no 4 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 6; hex 414343303031; asc ACC001;;
+ 1: len 8; hex 8000000000000042; asc        B;;
+
+
+# (2) 正在等待 ACC002（被事务1持有）
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 242 page no 5 n bits 72 index account_no of table `transaction_study`.`account_lock` trx id 1172964 lock_mode X locks rec but not gap waiting
+
+# 这是 ACC002 的记录（heap no=6）
+Record lock, heap no 6 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 6; hex 414343303032; asc ACC002;;
+ 1: len 8; hex 8000000000000043; asc        C;;
+
+
+# InnoDB 选定回滚事务 (2)，打破死锁循环
+*** WE ROLL BACK TRANSACTION (2)
 ```
 
+它包含五个关键点：
 
+1. **两个事务正在执行的 SQL**
+2. **各自持有哪些行锁**
+3. **各自正在等待哪些行锁**
+4. **锁是加在哪个索引、哪条记录的**
+5. **InnoDB 回滚了哪个事务**
+
+学习死锁只需要盯着这部分，其他日志都属于系统运行状态，并不影响分析。
 
 
 
