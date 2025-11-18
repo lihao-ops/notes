@@ -4189,9 +4189,21 @@ T4  事务B: SELECT * FROM account WHERE id=1 FOR UPDATE; -- 等待锁A
 
 #### 查看死锁日志
 
-```sql
-SHOW ENGINE INNODB STATUS\G
 
+
+##### 1.执行sql
+
+>show engine innodb status;
+
+```sql
+SHOW ENGINE INNODB STATUS;
+```
+
+
+
+##### 2.输出关键部分
+
+```sql
 -- 输出示例（关键部分）
 ------------------------
 LATEST DETECTED DEADLOCK
@@ -4221,6 +4233,197 @@ trx id 12346 lock_mode X locks rec but not gap
 
 *** WE ROLL BACK TRANSACTION (1)
 ```
+
+
+
+
+
+##### 3.完整输出日志
+
+>InnoDB 监控输出开始
+
+```text
+=====================================
+2025-11-18 20:49:16 0x8c0c INNODB MONITOR OUTPUT
+=====================================
+# 本段只是统计部分，无关死锁
+Per second averages calculated from the last 0 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 2829 srv_active, 0 srv_shutdown, 364950 srv_idle
+srv_master_thread log flush and writes: 0
+----------
+SEMAPHORES
+----------
+# 锁等待/信号统计，与死锁无直接关系
+OS WAIT ARRAY INFO: reservation count 104746
+OS WAIT ARRAY INFO: signal count 93828
+RW-shared spins 0, rounds 0, OS waits 0
+RW-excl spins 0, rounds 0, OS waits 0
+RW-sx spins 0, rounds 0, OS waits 0
+Spin rounds per wait: 0.00 RW-shared, 0.00 RW-excl, 0.00 RW-sx
+
+# 🍀 **下面开始真正的死锁信息**
+------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+2025-11-18 20:39:31 0x2f7c
+
+# (1) 事务 1172965，正在执行 SELECT … FOR UPDATE
+*** (1) TRANSACTION:
+TRANSACTION 1172965, ACTIVE 1 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 4 lock struct(s), heap size 1128, 3 row lock(s)
+MySQL thread id 3780, OS thread handle 5168, query id 235096 localhost 127.0.0.1 root statistics
+select a1_0.id,a1_0.account_no,a1_0.balance,a1_0.version 
+from account_lock a1_0 
+where a1_0.account_no='ACC001' for update
+
+# (1) 当前持有 ACC002 的行锁（X 锁，记录锁）
+*** (1) HOLDS THE LOCK(S):
+RECORD LOCKS space id 242 page no 5 n bits 72 index account_no of table `transaction_study`.`account_lock` trx id 1172965 lock_mode X locks rec but not gap
+Record lock, heap no 6 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 6; hex 414343303032; asc ACC002;;
+ 1: len 8; hex 8000000000000043; asc        C;;
+
+# (1) 正在等待获取 ACC001 的记录锁（被事务 1172964 占着）
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 242 page no 5 n bits 72 index account_no of table `transaction_study`.`account_lock` trx id 1172965 lock_mode X locks rec but not gap waiting
+Record lock, heap no 4 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 6; hex 414343303031; asc ACC001;;
+ 1: len 8; hex 8000000000000042; asc        B;;
+
+# (2) 事务 1172964，正在执行 SELECT … FOR UPDATE
+*** (2) TRANSACTION:
+TRANSACTION 1172964, ACTIVE 1 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 4 lock struct(s), heap size 1128, 3 row lock(s)
+MySQL thread id 3779, OS thread handle 29436, query id 235097 localhost 127.0.0.1 root statistics
+select a1_0.id,a1_0.account_no,a1_0.balance,a1_0.version 
+from account_lock a1_0 
+where a1_0.account_no='ACC002' for update
+
+# (2) 持有 ACC001 的记录锁（与上面相反）
+*** (2) HOLDS THE LOCK(S):
+RECORD LOCKS space id 242 page no 5 n bits 72 index account_no of table `transaction_study`.`account_lock` trx id 1172964 lock_mode X locks rec but not gap
+Record lock, heap no 4 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 6; hex 414343303031; asc ACC001;;
+ 1: len 8; hex 8000000000000042; asc        B;;
+
+# (2) 正在等待 ACC002 的锁（被事务 1172965 占着）
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 242 page no 5 n bits 72 index account_no of table `transaction_study`.`account_lock` trx id 1172964 lock_mode X locks rec but not gap waiting
+Record lock, heap no 6 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 6; hex 414343303032; asc ACC002;;
+ 1: len 8; hex 8000000000000043; asc        C;;
+
+# 🔥 InnoDB 选择回滚事务 (2)，打破死锁
+*** WE ROLL BACK TRANSACTION (2)
+
+------------
+TRANSACTIONS
+------------
+# 下方是事务活动列表，与死锁本身无关
+Trx id counter 1172971
+Purge done for trx's n:o < 1172971 undo n:o < 0 state: running but idle
+History list length 0
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION 283585734056976, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 283585734054648, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 283585734053872, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+--------
+FILE I/O
+--------
+# 下方为 InnoDB 内部 I/O 线程与系统状态，正常现象
+I/O thread 0 state: wait Windows aio (insert buffer thread)
+I/O thread 1 state: wait Windows aio (read thread)
+I/O thread 2 state: wait Windows aio (read thread)
+I/O thread 3 state: wait Windows aio (read thread)
+I/O thread 4 state: wait Windows aio (read thread)
+I/O thread 5 state: wait Windows aio (write thread)
+I/O thread 6 state: wait Windows aio (write thread)
+I/O thread 7 state: wait Windows aio (write thread)
+I/O thread 8 state: wait Windows aio (write thread)
+Pending normal aio reads: [0, 0, 0, 0] , aio writes: [0, 0, 0, 0] ,
+ ibuf aio reads:
+Pending flushes (fsync) log: 0; buffer pool: 0
+364704 OS file reads, 577759 OS file writes, 157075 OS fsyncs
+0.00 reads/s, 0 avg bytes/read, 0.00 writes/s, 0.00 fsyncs/s
+-------------------------------------
+INSERT BUFFER AND ADAPTIVE HASH INDEX
+-------------------------------------
+# 与死锁无关
+Ibuf: size 1, free list len 3081, seg size 3083, 26057 merges
+merged operations:
+ insert 2292427, delete mark 0, delete 0
+discarded operations:
+ insert 0, delete mark 0, delete 0
+Hash table size 34679, node heap has 16 buffer(s)
+Hash table size 34679, node heap has 2 buffer(s)
+Hash table size 34679, node heap has 6 buffer(s)
+Hash table size 34679, node heap has 17 buffer(s)
+Hash table size 34679, node heap has 2 buffer(s)
+Hash table size 34679, node heap has 2 buffer(s)
+Hash table size 34679, node heap has 2 buffer(s)
+Hash table size 34679, node heap has 1 buffer(s)
+0.00 hash searches/s, 0.00 non-hash searches/s
+---
+LOG
+---
+# redo log 状态，与死锁无关
+Log sequence number          287386133058
+Log buffer assigned up to    287386133058
+Log buffer completed up to   287386133058
+Log written up to            287386133058
+Log flushed up to            287386133058
+Added dirty pages up to      287386133058
+Pages flushed up to          287386133058
+Last checkpoint at           287386133058
+Log minimum file id is       87744
+Log maximum file id is       87758
+224523 log i/o's done, 0.00 log i/o's/second
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+# buffer pool 信息，无关死锁
+Total large memory allocated 0
+Dictionary memory allocated 1569625
+Buffer pool size   8191
+Free buffers       1031
+Database pages     7112
+Old database pages 2606
+Modified db pages  0
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 30627, not young 18282483
+0.00 youngs/s, 0.00 non-youngs/s
+Pages read 364518, created 67917, written 266708
+0.00 reads/s, 0.00 creates/s, 0.00 writes/s
+No buffer pool page gets since the last printout
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 7112, unzip_LRU len: 0
+I/O sum[0]:cur[0], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+# 无关死锁，InnoDB 的行操作统计
+0 queries inside InnoDB, 0 queries in queue
+0 read views open inside InnoDB
+Process ID=7876, Main thread ID=13880 , state=sleeping
+Number of rows inserted 8582763, updated 3577, deleted 101, read 107577279
+0.00 inserts/s, 0.00 updates/s, 0.00 deletes/s, 0.00 reads/s
+Number of system rows inserted 357, updated 740, deleted 279, read 122663
+0.00 inserts/s, 0.00 updates/s, 0.00 deletes/s, 0.00 reads/s
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+```
+
+
 
 ---
 
