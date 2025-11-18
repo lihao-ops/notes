@@ -4651,9 +4651,22 @@ END OF INNODB MONITOR OUTPUT
 
 
 
-### 7.3 
+#### 死锁检测算法(Wait-for Graph等待图)
+
+InnoDB 的死锁检测算法是 *Wait-for Graph等待图*，一旦发现循环等待，会对“环”中的每个事务做代价评估：
 
 
+
+##### Wait-for Graph等待图算法
+
+>InnoDB会选择"回滚代价最小"的事务回滚
+
+最常见的判断依据是：
+
+1. **谁持有的锁更少**
+2. **执行的时间更短**
+3. **影响更小**
+4. **修改更少**
 
 
 
@@ -4669,7 +4682,7 @@ END OF INNODB MONITOR OUTPUT
 
 
 
-### 7.4 死锁预防策略
+### 7.3 死锁预防策略
 
 #### 1. 按固定顺序加锁
 
@@ -4774,7 +4787,7 @@ private void updateOrderInTransaction(Long orderId, BigDecimal result) {
 
 ---
 
-### 7.5 事务调优实战
+### 7.4 事务调优实战
 
 #### 1. 查找长事务
 
