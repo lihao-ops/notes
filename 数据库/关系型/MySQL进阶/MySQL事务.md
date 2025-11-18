@@ -4187,6 +4187,118 @@ T4  事务B: SELECT * FROM account WHERE id=1 FOR UPDATE; -- 等待锁A
 
 ### 7.2 死锁检测
 
+
+
+#### 死锁示例
+
+
+
+##### 示例流程
+
+```mermaid
+graph TD
+    开始A[事务A开始执行] --> A锁一[事务A执行语句 锁定账号ACC002 行锁]
+    A锁一 --> B开始[事务B开始执行]
+    B开始 --> B锁一[事务B执行语句 锁定账号ACC001 行锁]
+    B锁一 --> A等二[事务A再次执行语句 申请锁定账号ACC001 等待]
+    A等二 --> B等二[事务B再次执行语句 申请锁定账号ACC002 等待]
+    B等二 --> 形成死锁[事务A等待事务B 事务B等待事务A 形成循环等待]
+    形成死锁 --> 回滚事务[InnoDB检测到死锁 自动回滚其中一个事务]
+    回滚事务 --> 剩余事务继续[另一个事务正常提交]
+
+```
+
+
+
+##### 实际代码
+
+```java
+    /**
+     * 场景4：死锁场景复现
+     * <p>
+     * 实现思路：
+     * 1. 线程1：锁定ACC001 -> 尝试锁定ACC002
+     * 2. 线程2：锁定ACC002 -> 尝试锁定ACC001
+     * 3. 形成循环等待，触发死锁
+     * <p>
+     * 预期现象：
+     * - 两个事务互相持有对方需要的锁
+     * - MySQL死锁检测机制介入，回滚其中一个事务
+     * - 被回滚的事务抛出异常
+     * <p>
+     * 实际现象：
+     * - 日志显示两个线程都成功获取第一个锁
+     * - 尝试获取第二个锁时发生死锁
+     * - 一个事务被回滚，另一个继续执行
+     * | 事务  | 已持有    | 想获取    | 造成依赖    |
+     * | --- | ------ | ------ | ------- |
+     * | (1) | ACC002 | ACC001 | 等事务 (2) |
+     * | (2) | ACC001 | ACC002 | 等事务 (1) |
+     * 
+     */
+    @Test
+    public void testDeadlock() throws InterruptedException {
+        log.info("========== 场景4：死锁场景复现 ==========");
+
+        CountDownLatch startLatch = new CountDownLatch(1);
+        CountDownLatch endLatch = new CountDownLatch(2);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+
+        AtomicBoolean deadlockOccurred = new AtomicBoolean(false);
+
+        // 线程1：ACC001 -> ACC002
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                transactionTemplate.execute(status -> {
+                    transferWithDeadlock("ACC001", "ACC002", "线程1");
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("[线程1] 发生异常（可能是死锁被回滚）: {}", e.getMessage());
+                if (e.getMessage() != null && e.getMessage().contains("Deadlock")) {
+                    deadlockOccurred.set(true);
+                }
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        // 线程2：ACC002 -> ACC001
+        executor.submit(() -> {
+            try {
+                startLatch.await();
+                Thread.sleep(50);
+                transactionTemplate.execute(status -> {
+                    transferWithDeadlock("ACC002", "ACC001", "线程2");
+                    return null;
+                });
+            } catch (Exception e) {
+                log.error("[线程2] 发生异常（可能是死锁被回滚）: {}", e.getMessage());
+                if (e.getMessage() != null && e.getMessage().contains("Deadlock")) {
+                    deadlockOccurred.set(true);
+                }
+            } finally {
+                endLatch.countDown();
+            }
+        });
+
+        startLatch.countDown();
+        endLatch.await(10, TimeUnit.SECONDS);
+        executor.shutdown();
+
+        log.info("========== 死锁测试完成 ==========");
+
+        // 断言：应该发生死锁（至少一个线程被回滚）
+        assertTrue(deadlockOccurred.get(), "应该检测到死锁并回滚其中一个事务");
+        log.info("========== ✓ 测试通过：成功复现并检测到死锁 ==========");
+    }
+```
+
+
+
+
+
 #### 查看死锁日志
 
 
