@@ -4143,6 +4143,8 @@ T4  事务B: SELECT * FROM account WHERE id=1 FOR UPDATE; -- 等待锁A
 
 ---
 
+
+
 ### 7.2 死锁检测
 
 #### 查看死锁日志
