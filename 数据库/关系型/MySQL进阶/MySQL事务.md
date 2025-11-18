@@ -3882,8 +3882,6 @@ DELETE FROM account WHERE id = 1;               -- 自动加X排他锁
 
 
 
-# 书签
-
 ### 模拟面试
 
 ------
