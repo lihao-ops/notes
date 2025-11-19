@@ -4870,88 +4870,34 @@ Deadlock found when trying to get lock; try restarting transaction
 
 
 
+#### 2：使用乐观锁（版本号）代替悲观锁
+
+→ 没有锁就不会死锁
+ → 彻底绕过死锁问题
 
 
 
-
-#### 2. 缩短事务执行时间（减少锁持有时间）
-
+#### 3.减少死锁概率
 
 
 
-
-#### 3. 降低锁粒度（减少锁冲突）
-
-```java
-@Entity
-public class Account {
-    @Id
-    private Long id;
-    
-    @Version // 乐观锁版本号
-    private Integer version;
-    
-    private BigDecimal balance;
-}
-
-// 更新时自动检查版本号
-@Transactional
-public void updateBalance(Long id, BigDecimal amount) {
-    Account account = repository.findById(id).orElseThrow();
-    account.setBalance(account.getBalance().add(amount));
-    repository.save(account); 
-    // SQL: UPDATE account SET balance=?, version=version+1 
-    //      WHERE id=? AND version=?
-    // 如果version不匹配，抛 OptimisticLockingFailureException
-}
-```
-
-#### 4. 避免大范围范围查询（避免 next-key lock）
-
-```java
-// ❌ 长事务
-@Transactional
-public void processOrder(Long orderId) {
-    Order order = repository.findByIdForUpdate(orderId); // 加锁
-    
-    // 耗时操作
-    callThirdPartyAPI();      // 调用外部接口（2秒）
-    complexCalculation();     // 复杂计算（3秒）
-    sendEmail();              // 发送邮件（1秒）
-    
-    order.setStatus("COMPLETED");
-    repository.save(order);   // 释放锁
-    // 锁持有时间: 6秒+
-}
-
-// ✅ 短事务：将非DB操作移到事务外
-public void processOrder(Long orderId) {
-    // 非事务操作
-    String apiResult = callThirdPartyAPI();
-    BigDecimal result = complexCalculation();
-    
-    // 事务操作
-    updateOrderInTransaction(orderId, result);
-    
-    // 非事务操作
-    sendEmail();
-}
-
-@Transactional
-private void updateOrderInTransaction(Long orderId, BigDecimal result) {
-    Order order = repository.findByIdForUpdate(orderId);
-    order.setStatus("COMPLETED");
-    order.setAmount(result);
-    repository.save(order);
-    // 锁持有时间: <100ms
-}
-```
+##### 缩短事务执行时间（减少锁持有时间）
 
 
 
+##### 降低锁粒度（减少锁冲突）
 
 
-#### 5.使用乐观锁（版本号）代替悲观锁
+
+##### 避免大范围范围查询（避免 next-key lock）
+
+
+
+##### 拆分热点资源（减少竞争）
+
+
+
+##### 尽量减少一个事务内访问的资源数量
 
 
 
