@@ -4816,6 +4816,44 @@ select * from account where id in (a, b) order by id for update;
 
 
 
+##### 死锁案例(订单库存)顺序加锁解决死锁.md
+
+
+
+###### ✅ 库存扣减死锁案例（简要描述）
+
+在库存扣减的业务中，因为一次订单会操作多个商品（如套餐 A 包含商品 X、Y），如果两个并发订单在执行过程中 **以不同顺序加锁同一批商品**，就会形成循环等待，从而导致 MySQL 抛出死锁。
+
+**实际场景：**
+
+- 线程 A：先锁商品 PRO_MONTH，再锁 LIMIT_UP_MONTH
+- 线程 B：先锁 LIMIT_UP_MONTH，再锁 PRO_MONTH
+
+两边互相等待对方释放锁，满足死锁的“循环等待”条件。
+
+最终 MySQL 检测到死锁，回滚其中一个事务并抛异常：
+
+```
+Deadlock found when trying to get lock; try restarting transaction
+```
+
+**根因：**
+ MySQL 在逐条执行 `SELECT ... FOR UPDATE` 时，会对每条记录加行锁。如果加锁顺序不一致，就会导致两个事务互相等待并最终死锁。
+
+**解决方案：**
+ 在扣减库存前，通过统一顺序（如按 product_id 升序）排序商品列表，确保所有事务完全一致的加锁顺序，从根源上消除循环等待。
+
+> **一句话总结：**
+>  **死锁不是因为锁多，而是因为加锁顺序不一致。**
+
+
+
+
+
+
+
+
+
 ```java
 // ❌ 错误示例：可能死锁
 @Transactional
