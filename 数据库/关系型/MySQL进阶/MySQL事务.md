@@ -4776,7 +4776,7 @@ HOLDS ACC001
 
 
 
-### 7.3 死锁预防策略
+### 7.3 解决死锁
 
 #### 1. 按固定顺序加锁
 
@@ -4786,7 +4786,7 @@ HOLDS ACC001
 
 
 
-###### 按相同顺序加锁
+###### 按相同顺序加锁(最有效*)
 
 >多个事务访问同一批资源时，严格按相同顺序加锁。
 
@@ -4797,22 +4797,6 @@ HOLDS ACC001
 死锁要发生，必须要"环形等待"。
 
 统一顺序 ——> 环形断掉 ——> 不可能死锁
-
-
-
-###### 示例
-
-转账系统：永远按`account_id`升序锁两条记录
-
-```sql
--- 始终先锁id小的，再锁id大的
-select * from account where id in (a, b) order by id for update;
-```
-
-**适用场景：**
- 任何涉及多行更新的业务（转账、批量更新、订单扣库存）。
-
-
 
 
 
@@ -4852,31 +4836,9 @@ Deadlock found when trying to get lock; try restarting transaction
 
 
 
-
-
-```java
-// ❌ 错误示例：可能死锁
-@Transactional
-public void transfer(Long fromId, Long toId, BigDecimal amount) {
-    Account from = repository.findByIdForUpdate(fromId); // 先锁from
-    Account to = repository.findByIdForUpdate(toId);     // 再锁to
-    // 如果另一个事务先锁to再锁from，就会死锁
-}
-
-// ✅ 正确示例：按ID排序加锁
-@Transactional
-public void transfer(Long fromId, Long toId, BigDecimal amount) {
-    Long firstId = Math.min(fromId, toId);
-    Long secondId = Math.max(fromId, toId);
-    
-    Account first = repository.findByIdForUpdate(firstId);  // 始终先锁小ID
-    Account second = repository.findByIdForUpdate(secondId); // 再锁大ID
-    
-    // 执行转账逻辑
-}
-```
-
 #### 2. 设置锁等待超时
+
+
 
 ```sql
 -- 设置锁等待超时时间（秒）
