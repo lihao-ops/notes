@@ -5321,8 +5321,6 @@ COMMIT;
 
 
 
-
-
 ##### 复现未commit事务案例
 
 
@@ -5406,13 +5404,18 @@ COMMIT;
 
 
 
-
-
 ###### 实际方法执行
 
 ```java
-    /**
+   /**
      * 真正会造成长事务：手动开启事务、手动不提交
+     *
+     * 复现未提交事务（长事务）的核心步骤：
+     * 1. 使用编程式事务手动开启事务（绕过 @Transactional 的方法级生命周期）。
+     * 2. 执行更新语句，InnoDB 会对目标行加 X 锁，但不会释放。
+     * 3. 故意制造异常并 catch，使 Spring 无法自动 rollback。
+     * 4. 整个方法不调用 commit/rollback，事务保持 RUNNING 状态。
+     * 5. 只要线程/连接不结束，这个事务就一直存在（可在 innodb_trx 查询到）。
      */
     public void openLongTxWithoutCommit() {
         DefaultTransactionDefinition def = new DefaultTransactionDefinition();
@@ -5442,6 +5445,19 @@ COMMIT;
 ###### 测试类
 
 ```java
+    /**
+     * 复现成功，但最后会回滚是因为:
+     * 运行单元测试，Spring Boot Test 有默认策略：
+     * 每个测试方法运行结束后，自动回滚所有事务
+     * 测试步骤：
+     * 1. 调用业务方法制造一个未提交事务。
+     * 2. Sleep 一段时间，确保事务仍处于 RUNNING 状态（方法未退出）。
+     * 3. 通过 JDBC 查询 information_schema.innodb_trx 验证事务是否存在。
+     * <p>
+     * 关键点：
+     * - 测试方法不能立即结束，否则 Spring Test 会自动 rollback。
+     * - 在方法暂停期间，可在 SQL 客户端中看到长事务记录。
+     */
     @Test
     public void testLongTransaction() throws Exception {
         log.warn("========== 开始制造长事务 ==========");
@@ -5471,12 +5487,6 @@ COMMIT;
         log.warn("========== 测试结束 ==========");
     }
 ```
-
-
-
-
-
-
 
 
 
