@@ -5509,33 +5509,76 @@ COMMIT;
 
 #### 2. 查看锁等待
 
->MySQL 8.0 下查看“当前谁在等谁”的锁等待链
+
+
+##### MySQL 8.0 下查看“当前谁在等谁”的锁等待链
 
 ```sql
 -- 查看当前锁等待情况(MySQL8.0)
 SELECT
-    r.trx_id AS waiting_trx_id,
-    r.trx_mysql_thread_id AS waiting_thread,
-    r.trx_query AS waiting_query,
+    w.REQUESTING_ENGINE_TRANSACTION_ID AS waiting_trx,
+    w.BLOCKING_ENGINE_TRANSACTION_ID   AS blocking_trx,
 
-    b.trx_id AS blocking_trx_id,
-    b.trx_mysql_thread_id AS blocking_thread,
-    b.trx_query AS blocking_query
+    dl.OBJECT_SCHEMA,
+    dl.OBJECT_NAME,
+    dl.INDEX_NAME,
+    dl.LOCK_TYPE,
+    dl.LOCK_MODE,
+    dl.LOCK_DATA
 FROM performance_schema.data_lock_waits w
-JOIN information_schema.innodb_trx r
-    ON w.REQUESTING_ENGINE_TRANSACTION_ID = r.trx_id
-JOIN information_schema.innodb_trx b
-    ON w.BLOCKING_ENGINE_TRANSACTION_ID = b.trx_id;
+JOIN performance_schema.data_locks dl
+    ON w.REQUESTING_ENGINE_TRANSACTION_ID = dl.ENGINE_TRANSACTION_ID;
 ```
 
-| 字段                       | 示例值              | 含义说明                                                     |
-| -------------------------- | ------------------- | ------------------------------------------------------------ |
-| **trx_id**                 | 1186571             | InnoDB 分配的**事务 ID**，用于唯一标识一个事务，系统内部递增。 |
-| **trx_state**              | RUNNING             | 事务当前状态：RUNNING（正常运行）、LOCK WAIT（等待锁）、ROLLING BACK 等。 |
-| **trx_started**            | 2025-11-22 17:18:00 | 事务开始执行的时间。                                         |
-| **duration**（SQL 里自算） | 8                   | 当前事务已运行时间 = NOW() - trx_started（单位：秒）。       |
-| **trx_mysql_thread_id**    | 361                 | MySQL 内部线程 ID，可用于 `KILL 361` 来终止该事务。          |
-| **trx_query**              | NULL                | 当前事务正在执行的 SQL，如果在等待锁或空闲中可能为 NULL。    |
+
+
+##### 字段含义
+
+>这是 **MySQL 8.0 的官方锁等待链表**，只要有事务在等待锁，就会出现这里。
+
+| 字段名            | 示例值                       | 含义                                          |
+| ----------------- | ---------------------------- | --------------------------------------------- |
+| **OBJECT_SCHEMA** | transaction_study            | 锁涉及的库名                                  |
+| **OBJECT_NAME**   | account_lock                 | 锁涉及的表名                                  |
+| **INDEX_NAME**    | PRIMARY / idx_xxx            | 锁涉及哪个 B+Tree 索引                        |
+| **LOCK_TYPE**     | RECORD                       | 锁类型，常见：RECORD（记录锁）、TABLE（表锁） |
+| **LOCK_MODE**     | X / XGAP / XNEXTKEY          | 加了什么锁（排它锁、间隙锁、临键锁）          |
+| **LOCK_DATA**     | 1 / (supremum pseudo-record) | 锁住的具体对象：                              |
+
+
+
+##### 能做什么？
+
+
+
+###### ✔ 找到“谁在等锁”
+
+waiting_trx = 等待者
+ blocking_trx = 占着锁不放的事务
+
+###### ✔ 找到“等的是哪个库的哪个表”
+
+OBJECT_SCHEMA
+ OBJECT_NAME
+
+###### ✔ 找到“锁住了哪条记录”
+
+LOCK_DATA
+ （例如 PK=1）
+
+###### ✔ 找到“锁的是哪种锁”
+
+LOCK_MODE
+ （例如 Next-Key Lock）
+
+###### ✔ 找到“是哪个索引导致的锁”
+
+INDEX_NAME
+ （PRIMARY 说明主键范围锁）
+
+
+
+
 
 
 
