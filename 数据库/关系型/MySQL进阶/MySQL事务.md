@@ -5270,6 +5270,59 @@ FROM information_schema.innodb_trx
 WHERE TIMESTAMPDIFF(SECOND, trx_started, NOW()) > 10;
 ```
 
+
+
+
+
+#### 2.查找活跃事务表(所有未提交的事务)
+
+
+
+##### 你忘了事务，会造成实际业务故障
+
+例如：
+
+- 一段 Java 代码没有 commit
+- **一个业务连接卡死**
+- **一个事务开了太久导致全库阻塞**
+
+这时 DBA 会用：
+
+```
+KILL <thread_id>;
+```
+
+强行关闭连接，MySQL 自动 rollback。
+
+
+
+##### 查询所有未提交的事务
+
+```sql
+-- InnoDB 的“活跃事务表”，所有未提交的事务都会在这里出现。
+SELECT trx_id,
+       trx_state,
+       trx_started,
+       TIMESTAMPDIFF(SECOND, trx_started, NOW()) AS duration,
+       trx_mysql_thread_id,
+       trx_query
+FROM information_schema.innodb_trx;
+```
+
+
+
+##### 手动commit
+
+> 如果出现了表中还存在未提交的事务一定要手动commit
+
+```sql
+COMMIT;
+```
+
+
+
+
+
 #### 2. 查看锁等待
 
 ```sql
