@@ -5725,7 +5725,7 @@ MySQL 最贵的不是 SQL，而是：
 
 ##### 怎么优化？核心是 5 个参数
 
-# **① maximum-pool-size（最大连接数）🔥最重要**
+###### ① maximum-pool-size（最大连接数）🔥最重要
 
 决定最大能同时服务多少 SQL。
 
@@ -5741,7 +5741,7 @@ MySQL 最贵的不是 SQL，而是：
 
 ------
 
-# **② minimum-idle（最小空闲）**
+###### ② minimum-idle（最小空闲）
 
 池中最少保留的空闲连接数。
 
@@ -5750,7 +5750,7 @@ MySQL 最贵的不是 SQL，而是：
 
 ------
 
-# **③ connection-timeout（等待连接的最大时间）**
+###### ③ connection-timeout（等待连接的最大时间）
 
 默认 30 秒。
 
@@ -5764,7 +5764,7 @@ Connection is not available, request timed out after xxx ms.
 
 ------
 
-# **④ idle-timeout（空闲连接多久被回收）**
+###### ④ idle-timeout（空闲连接多久被回收）
 
 太短会频繁建连；太长会导致连接僵尸化。
 
@@ -5772,7 +5772,7 @@ Connection is not available, request timed out after xxx ms.
 
 ------
 
-# **⑤ max-lifetime（连接存活上限）**
+###### ⑤ max-lifetime（连接存活上限）
 
 防止长连接被：
 
