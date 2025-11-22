@@ -5298,6 +5298,8 @@ KILL <thread_id>;
 
 ##### 查询所有未提交的事务
 
+>通过查询innodb_trx表可以查询到目前所有未提交的事务
+
 ```sql
 -- InnoDB 的“活跃事务表”，所有未提交的事务都会在这里出现。
 SELECT trx_id,
@@ -5308,6 +5310,19 @@ SELECT trx_id,
        trx_query
 FROM information_schema.innodb_trx;
 ```
+
+>返回字段大概含义
+
+| 字段                              | 示例值              | 含义                                              |
+| --------------------------------- | ------------------- | ------------------------------------------------- |
+| **trx_id**                        | 1186571             | InnoDB 生成的“事务 ID”，用于标识当前事务，递增。  |
+| **trx_state**                     | RUNNING             | 事务状态：RUNNING / LOCK WAIT / ROLLING BACK 等。 |
+| **trx_started**                   | 2025-11-22 17:18:00 | 事务开始时间。                                    |
+| **duration**（你 SQL 里自己算的） | 8                   | 事务持续秒数（当前时间 - trx_started）。          |
+| **trx_mysql_thread_id**           | 361                 | MySQL 内部线程 ID，可用来 KILL 一个事务。         |
+| **trx_query**                     | NULL                | 当前事务正在执行的 SQL 语句。                     |
+
+
 
 
 
@@ -5495,18 +5510,25 @@ COMMIT;
 #### 2. 查看锁等待
 
 ```sql
--- 查看当前锁等待情况
-SELECT 
+-- 查看当前锁等待情况(MySQL8.0)
+SELECT
     r.trx_id AS waiting_trx_id,
     r.trx_mysql_thread_id AS waiting_thread,
     r.trx_query AS waiting_query,
+
     b.trx_id AS blocking_trx_id,
     b.trx_mysql_thread_id AS blocking_thread,
     b.trx_query AS blocking_query
-FROM information_schema.innodb_lock_waits w
-INNER JOIN information_schema.innodb_trx b ON b.trx_id = w.blocking_trx_id
-INNER JOIN information_schema.innodb_trx r ON r.trx_id = w.requesting_trx_id;
+FROM performance_schema.data_lock_waits w
+JOIN information_schema.innodb_trx r
+    ON w.REQUESTING_ENGINE_TRANSACTION_ID = r.trx_id
+JOIN information_schema.innodb_trx b
+    ON w.BLOCKING_ENGINE_TRANSACTION_ID = b.trx_id;
 ```
+
+
+
+
 
 #### 3. 批量操作优化
 
