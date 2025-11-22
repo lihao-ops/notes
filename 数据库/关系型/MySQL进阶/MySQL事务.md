@@ -4874,75 +4874,73 @@ Deadlock found when trying to get lock; try restarting transaction
 
 
 
+##### 案例流程图
+
+
+
 ```mermaid
 flowchart TD
 
-开始读取数据["读取数据  
-执行查询语句  
-查询商品库存和版本号  
-示例  
-查询  
-选择全部字段  
-来自 商品库存表  
-条件 商品编码 等于 指定编码"]
+读取数据["线程读取库存与版本号  
+SQL:  
+SELECT  
+  id, product_code, stock_quantity, version  
+FROM product_stock  
+WHERE product_code = 'PRO_MONTH';"]
 
-线程A读取["线程A读取数据  
-库存 等于 一百  
-版本号 等于 一"]
+线程A读取["线程A读取结果  
+stock_quantity = 100  
+version = 1"]
 
-线程B读取["线程B读取数据  
-库存 等于 一百  
-版本号 等于 一"]
+线程B读取["线程B读取结果  
+stock_quantity = 100  
+version = 1"]
 
-并发更新开始["两个线程同时进入更新流程  
-准备执行更新操作"]
+并发更新["两个线程同时尝试执行更新  
+准备 CAS"]
 
-线程B更新成功["线程B更新成功  
-执行更新语句  
-更新 商品库存表  
-设置 库存数量 减一  
-设置 版本号 加一  
-条件 商品编码 等于 指定编码  
-并且 版本号 等于 一  
-示例  
-更新 商品库存表  
-设置 库存数量 等于 库存数量 减 一  
-设置 版本号 等于 版本号 加 一  
-条件 商品编码 等于 指定编码  
-并且 版本号 等于 一  
-更新成功  
-数据库中版本号变为二"]
+线程B更新成功["线程B执行更新成功  
+SQL:  
+UPDATE product_stock  
+SET  
+  stock_quantity = stock_quantity - 1,  
+  version = version + 1  
+WHERE  
+  product_code = 'PRO_MONTH'  
+  AND version = 1;  
+影响行数 = 1  
+数据库版本号变为 2"]
 
-线程A更新失败["线程A更新失败  
-执行相同更新语句  
-但条件版本号等于一不成立  
-因为真实版本号已变为二  
-示例  
-更新 商品库存表  
-设置 库存数量 等于 库存数量 减 一  
-设置 版本号 等于 版本号 加 一  
-条件 商品编码 等于 指定编码  
-并且 版本号 等于 一  
-返回零行受影响  
-更新失败  
-出现乐观锁冲突"]
+线程A更新失败["线程A执行更新失败  
+SQL:  
+UPDATE product_stock  
+SET  
+  stock_quantity = stock_quantity - 1,  
+  version = version + 1  
+WHERE  
+  product_code = 'PRO_MONTH'  
+  AND version = 1;  
+影响行数 = 0  
+因为真实 version 已变为 2  
+CAS 冲突 → 更新失败"]
 
-结束["线程B成功提交  
-线程A提交失败  
-最终只有一个线程成功扣减库存  
-不会产生死锁"]
+结束["线程B成功扣减库存  
+线程A CAS 失败  
+最终仅一个线程成功更新  
+无死锁、无阻塞"]
 
-开始读取数据 --> 线程A读取
-开始读取数据 --> 线程B读取
+读取数据 --> 线程A读取
+读取数据 --> 线程B读取
 
-线程A读取 --> 并发更新开始
-线程B读取 --> 并发更新开始
+线程A读取 --> 并发更新
+线程B读取 --> 并发更新
 
-并发更新开始 --> 线程B更新成功
-并发更新开始 --> 线程A更新失败
+并发更新 --> 线程B更新成功
+并发更新 --> 线程A更新失败
 
 线程B更新成功 --> 结束
 线程A更新失败 --> 结束
+
 ```
 
 
