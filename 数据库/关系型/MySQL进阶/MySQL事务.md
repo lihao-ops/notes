@@ -5509,6 +5509,8 @@ COMMIT;
 
 #### 2. 查看锁等待
 
+>MySQL 8.0 下查看“当前谁在等谁”的锁等待链
+
 ```sql
 -- 查看当前锁等待情况(MySQL8.0)
 SELECT
@@ -5526,7 +5528,14 @@ JOIN information_schema.innodb_trx b
     ON w.BLOCKING_ENGINE_TRANSACTION_ID = b.trx_id;
 ```
 
-
+| 字段                       | 示例值              | 含义说明                                                     |
+| -------------------------- | ------------------- | ------------------------------------------------------------ |
+| **trx_id**                 | 1186571             | InnoDB 分配的**事务 ID**，用于唯一标识一个事务，系统内部递增。 |
+| **trx_state**              | RUNNING             | 事务当前状态：RUNNING（正常运行）、LOCK WAIT（等待锁）、ROLLING BACK 等。 |
+| **trx_started**            | 2025-11-22 17:18:00 | 事务开始执行的时间。                                         |
+| **duration**（SQL 里自算） | 8                   | 当前事务已运行时间 = NOW() - trx_started（单位：秒）。       |
+| **trx_mysql_thread_id**    | 361                 | MySQL 内部线程 ID，可用于 `KILL 361` 来终止该事务。          |
+| **trx_query**              | NULL                | 当前事务正在执行的 SQL，如果在等待锁或空闲中可能为 NULL。    |
 
 
 
