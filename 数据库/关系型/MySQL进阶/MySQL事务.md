@@ -4925,6 +4925,37 @@ Deadlock found when trying to get lock; try restarting transaction
 
 
 
+###### 2.基于比较时间戳/Token(Variant)
+
+>如
+
+- `update_time`
+- `hash校验`
+- `随机token`
+
+本质依然是比较某个字段 ——> 匹配 ——> 原子更新
+
+>核心特征
+
+只有CAS成功才实际更新，不成功不影响任何数据。
+
+
+
+##### 适用于那些场景(非常重要)
+
+
+
+###### 高频读，低频写
+
+>例如
+
+- 查询频繁，修改不多
+- 修改冲突概率小
+
+
+
+###### 
+
 
 
 
