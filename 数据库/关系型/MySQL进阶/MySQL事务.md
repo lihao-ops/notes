@@ -5687,6 +5687,8 @@ private void saveBatch(List<Account> accounts) {
 
 #### 4. 连接池优化
 
+>连接池优化的核心是减少建连销毁开销，维持最佳数量的可用连接，避免连接枯竭、僵死和排队，从而提升系统吞吐量与稳定性。
+
 
 
 ##### 什么是连接池优化？
@@ -5786,6 +5788,8 @@ Connection is not available, request timed out after xxx ms.
 
 
 
+##### 通用配置
+
 ```yaml
 # application.yml
 spring:
@@ -5793,20 +5797,41 @@ spring:
     hikari:
       minimum-idle: 10           # 最小空闲连接
       maximum-pool-size: 50      # 最大连接数
-      connection-timeout: 30000  # 连接超时(ms)
-      idle-timeout: 600000       # 空闲超时(ms)
-      max-lifetime: 1800000      # 连接最大存活时间(ms)
+      connection-timeout: 8000   # 连接超时(ms)
+      idle-timeout: 600000       # 空闲超时(ms) - 10 分钟
+      max-lifetime: 1800000      # 连接最大存活时间(ms)-30分钟
       
       # 性能优化
       auto-commit: false         # 关闭自动提交
       connection-test-query: SELECT 1  # 连接测试查询
 ```
 
+这套配置：
+
+- 不会阻塞线程
+- 不会产生长连接问题
+- 不会把 MySQL 撑爆
+- 能兼容各种云/k8s/网关 idle timeout
 
 
 
+##### 压测方案
 
+>连接池参数 = 10 / 50 / 100 时的 QPS 对比
+>
+>wrk 压测报告
+>
+>MySQL connection usage 变化
 
+通过压测确定：
+
+- 增大连接池 → QPS 是否提升？
+- 什么时候 QPS 不再提升？
+- 什么时候 RT/错误率开始上升？
+- 什么时候 MySQL CPU 撑满？
+- 什么时候出现 connection wait？
+
+**最佳值 = QPS 达到最高，但延迟/CPU/错误率仍健康的那个区间。**
 
 
 
