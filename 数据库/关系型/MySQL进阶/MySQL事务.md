@@ -5019,9 +5019,21 @@ Deadlock found when trying to get lock; try restarting transaction
 
 ##### 优点
 
+- **无锁、高并发、高吞吐**
+- **不会形成死锁**
+- **没有等待链，响应快**
+- **CAS成功即更新，失败不影响数据**
+- MySQL层实现简单(只需要`where version= ?`)
 
 
 
+##### 缺点
+
+- 不能跨多行实现原子性(案例场景踩坑了)
+- CAS冲突率高时，性能急剧下降
+- 多次失败需要重试逻辑
+- 不适合大事务
+- 不适合写非常密集的场景。
 
 
 
