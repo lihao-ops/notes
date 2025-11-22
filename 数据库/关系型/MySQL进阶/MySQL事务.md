@@ -5323,6 +5323,165 @@ COMMIT;
 
 
 
+##### 复现未commit事务案例
+
+
+
+###### 实现思路
+
+```java
+/**
+ * 复现 MySQL “未提交事务（长事务）” 的完整思路说明
+ * ----------------------------------------------------
+ *
+ * 💡 背景知识
+ * 在 MySQL（InnoDB）中，事务的生命周期由“连接 + commit/rollback”决定，
+ * 而不是由 SQL 本身决定。
+ * 只要：
+ *     1) 事务已开启
+ *     2) 未提交 / 未回滚
+ *     3) JDBC 连接未关闭 / 未归还连接池
+ * 那么事务就会一直以 RUNNING 状态存在，长期占用行锁、undo log、MVCC 版本链。
+ *
+ * ⚠️ 但 Spring @Transactional 是“方法级事务”，方法结束时框架会自动提交或回滚，
+ * 因此无法真正复现“长事务”。
+ *
+ * ----------------------------------------------------
+ * 🔥 本案例的核心目标
+ * 通过“编程式事务 + 故意不提交”来手动制造一个真实的长事务，
+ * 以便在库中通过：
+ *
+ *     SELECT * FROM information_schema.innodb_trx;
+ *
+ * 观察到 RUNNING 状态的未提交事务。
+ *
+ * ----------------------------------------------------
+ * 🔍 复现长事务的关键步骤
+ *
+ * Step 1）手动开启事务（跳过 @Transactional 的生命周期）
+ *   使用 PlatformTransactionManager + DefaultTransactionDefinition
+ *   让事务不受 Spring AOP 管控，生命周期完全由我们决定。
+ *
+ * Step 2）执行一条写操作（UPDATE）
+ *   InnoDB 会对目标行加排他锁（X 锁），锁不会释放，直到 commit/rollback。
+ *
+ * Step 3）故意制造异常并 catch（不抛给 Spring）
+ *   捕获异常 = Spring 不会自动触发 rollback
+ *   事务仍然处于 active 状态
+ *
+ * Step 4）不调用 commit()、不调用 rollback()
+ *   事务保持未结束 → 行锁悬挂 → 事务一直 RUNNING
+ *
+ * Step 5）测试中暂停（Thread.sleep 或打断点）
+ *   保证测试方法不结束，否则 Spring Test 会自动 rollback 事务。
+ *
+ * Step 6）使用 JDBC 查询 information_schema.innodb_trx
+ *   可以看到 trx_state = RUNNING 的长事务，证明事务确实未提交。
+ *
+ * ----------------------------------------------------
+ * ✔ 复现结果
+ *   - 在 SQLyog/命令中可以看到活跃事务
+ *   - trx_state = RUNNING
+ *   - trx_query 可能为 NULL（执行结束但未提交）
+ *   - 持有行锁 → 其他 UPDATE 会阻塞
+ *
+ * ----------------------------------------------------
+ * 🧩 为什么一定要用编程式事务？
+ *
+ * 因为：
+ *   1）@Transactional 方法退出时 → Spring 自动 rollback
+ *   2）JUnit 测试结束时 → Spring Test 也会自动 rollback
+ *
+ * 所以如果想制造“方法退出后事务依然存在”的场景，
+ * 就必须绕过 Spring AOP 的声明式事务机制。
+ *
+ * ----------------------------------------------------
+ * 🎯 这个案例的价值（面试官喜欢听）
+ *   - 能说明你理解 Spring 事务的生命周期
+ *   - 能说明你知道长事务如何产生
+ *   - 能说明你知道如何在生产定位长事务
+ *   - 能说明你清楚长事务的危害（锁阻塞、undo log 膨胀、MVCC 老版本堆积）
+ */
+```
+
+
+
+
+
+###### 实际方法执行
+
+```java
+    /**
+     * 真正会造成长事务：手动开启事务、手动不提交
+     */
+    public void openLongTxWithoutCommit() {
+        DefaultTransactionDefinition def = new DefaultTransactionDefinition();
+        def.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+        def.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRED);
+
+        // 手动开启事务（不会自动关闭）
+        TransactionStatus status = txManager.getTransaction(def);
+
+        try {
+            log.warn("[长事务] 执行更新...");
+            stockMapper.deductStock("PRO_MONTH", 1);
+
+            int x = 1 / 0; // 故意异常
+
+        } catch (Exception e) {
+            log.error("[长事务] 异常已捕获，但我们不提交、不回滚！事务挂住！");
+            // ❗ 不 rollback、不中止、不中断
+        }
+        // ❗ 方法退出 → 事务依然打开没有提交
+        log.warn("[长事务] 方法退出，但事务仍然保持打开状态（不会 auto rollback）");
+    }
+```
+
+
+
+###### 测试类
+
+```java
+    @Test
+    public void testLongTransaction() throws Exception {
+        log.warn("========== 开始制造长事务 ==========");
+        hiddenTxService.openLongTxWithoutCommit();
+
+        Thread.sleep(5000); // 等待事务挂住
+
+        log.warn("========== 查询 innodb_trx ==========");
+
+        String sql = "SELECT trx_id, trx_state, trx_started, trx_query " +
+                "FROM information_schema.innodb_trx";
+
+        try (Connection conn = DriverManager.getConnection(
+                "jdbc:mysql://localhost:3306/transaction_study?useSSL=false&serverTimezone=Asia/Shanghai",
+                "root", "Q836184425");
+             Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(sql)) {
+
+            while (rs.next()) {
+                log.error("【活跃事务】trx_id={}, state={}, query={}",
+                        rs.getString("trx_id"),
+                        rs.getString("trx_state"),
+                        rs.getString("trx_query"));
+            }
+        }
+
+        log.warn("========== 测试结束 ==========");
+    }
+```
+
+
+
+
+
+
+
+
+
+
+
 #### 2. 查看锁等待
 
 ```sql
