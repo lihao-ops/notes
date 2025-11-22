@@ -4870,11 +4870,14 @@ Deadlock found when trying to get lock; try restarting transaction
 
 
 
-#### 2.乐观锁（版本号)
+#### 2.乐观锁（版本号,读无锁，写记录锁)
 
 
 
 ##### 案例流程图
+
+>在 InnoDB 中，普通 SELECT 是“快照读”，由 MVCC 提供一致性，不会加任何锁；
+> UPDATE 是“当前读”，**必须修改最新版本，因此会加记录锁（Record Lock）**。
 
 
 
@@ -5109,14 +5112,6 @@ CAS 冲突 → 更新失败"]
 - 多次失败需要重试逻辑
 - 不适合大事务
 - 不适合写非常密集的场景。
-
-
-
-
-
-
-
-
 
 
 
