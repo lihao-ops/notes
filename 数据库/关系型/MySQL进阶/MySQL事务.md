@@ -4872,6 +4872,20 @@ Deadlock found when trying to get lock; try restarting transaction
 
 #### 2.使用乐观锁（版本号）代替悲观锁
 
+
+
+##### 乐观锁是什么？
+
+.
+
+
+
+
+
+
+
+
+
 → 没有锁就不会死锁
  → 彻底绕过死锁问题
 
