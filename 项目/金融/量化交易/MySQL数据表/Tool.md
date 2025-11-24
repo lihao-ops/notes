@@ -317,30 +317,154 @@ mysql>
 >测试select权限(旧表)
 
 ```sql
-#第 1 步：测试 SELECT 权限（旧表）
-#如果返回数字（比如 30000000 或者类似），说明：
-#✔ 可以读旧月表（历史分表）
-USE a_share_quant;
+hli@hli:~$ mysql -u hli_gho -p -h 192.168.168.57 -P 3306
+Enter password:
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 1041
+Server version: 8.0.42 MySQL Community Server - GPL
 
-SELECT COUNT(*) 
-FROM tb_quotation_history_trend_202001 
-LIMIT 1;
+Copyright (c) 2000, 2025, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> SHOW MASTER STATUS;
++---------------+-----------+--------------+------------------+-------------------+
+| File          | Position  | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++---------------+-----------+--------------+------------------+-------------------+
+| binlog.000128 | 623251348 |              |                  |                   |
++---------------+-----------+--------------+------------------+-------------------+
+1 row in set (0.00 sec)
+
+mysql> USE a_share_quant;
+*) FROM tb_quotation_history_trend_202001 LIMIT 1;Reading table information for completion of table and column names
+You can turn off this feature to get a quicker startup with -A
+
+Database changed
+mysql> SELECT COUNT(*) FROM tb_quotation_history_trend_202001 LIMIT 1;
++----------+
+| COUNT(*) |
++----------+
+| 13344002 |
++----------+
+1 row in set (6.02 sec)
+
+mysql>
+```
 
 
-#第 2 步：测试 INSERT 权限（新温表）
-#不会污染真实数据，因为我们用事务回滚。
-START TRANSACTION;
 
-INSERT INTO tb_quotation_history_warm
-(wind_code, trade_date, latest_price, total_volume, average_price, STATUS)
-VALUES ('TEST123', '2020-01-01 09:30:00', 1.23, 1000, 1.23, 1);
-ROLLBACK;
 
-#第 3 步（可选）：测试 UPDATE/DELETE 权限
-#如果成功UPDATE 权限也正常
-START TRANSACTION;
-UPDATE tb_quotation_history_warm SET STATUS = 0 WHERE wind_code='TEST123';
-ROLLBACK;
+
+```sql
+hli@hli:~$ gh-ost \
+ --user="hli_gho" \
+ --password="Q836184425" \
+ --host="192.168.168.57" \
+ --database="a_share_quant" \
+ --table="tb_quotation_history_trend_202001" \
+ --alter="ENGINE=InnoDB" \
+ --allow-on-master \
+ --initially-drop-ghost-table \
+ --initially-drop-old-table \
+ --verbose
+2025-11-24 21:49:51 INFO starting gh-ost 1.1.7 (git commit: d5ab048c1f046821f3c7384a386fc1c3ae399c92)
+2025-11-24 21:49:51 INFO Migrating `a_share_quant`.`tb_quotation_history_trend_202001`
+2025-11-24 21:49:51 INFO inspector connection validated on 192.168.168.57:3306
+2025-11-24 21:49:51 INFO User has REPLICATION CLIENT, REPLICATION SLAVE privileges, and has ALL privileges on `a_share_quant`.*
+2025-11-24 21:49:51 INFO binary logs validated on 192.168.168.57:3306
+2025-11-24 21:49:51 INFO Restarting replication on 192.168.168.57:3306 to make sure binlog settings apply to replication thread
+2025-11-24 21:49:51 INFO Inspector initiated on hli:3306, version 8.0.42
+2025-11-24 21:49:51 INFO Table found. Engine=InnoDB
+2025-11-24 21:49:51 INFO Estimated number of rows via EXPLAIN: 12885383
+2025-11-24 21:49:51 INFO Recursively searching for replication master
+2025-11-24 21:49:51 INFO Master found to be hli:3306
+2025-11-24 21:49:51 INFO log_slave_updates validated on 192.168.168.57:3306
+2025-11-24 21:49:51 INFO streamer connection validated on 192.168.168.57:3306
+[2025/11/24 21:49:51] [info] binlogsyncer.go:173 create BinlogSyncer with config {ServerID:99999 Flavor:mysql Host:192.168.168.57 Port:3306 User:hli_gho Password: Localhost: Charset: SemiSyncEnabled:false RawModeEnabled:false TLSConfig:<nil> ParseTime:false TimestampStringLocation:UTC UseDecimal:true RecvBufferSize:0 HeartbeatPeriod:0s ReadTimeout:0s MaxReconnectAttempts:0 DisableRetrySync:false VerifyChecksum:false DumpCommandFlag:0 Option:<nil> Logger:0xc00009e7e0 Dialer:0x6bc600 RowsEventDecodeFunc:<nil> DiscardGTIDSet:false}
+2025-11-24 21:49:51 INFO Connecting binlog streamer at binlog.000128:623251348
+[2025/11/24 21:49:51] [info] binlogsyncer.go:410 begin to sync binlog from position (binlog.000128, 623251348)
+[2025/11/24 21:49:51] [info] binlogsyncer.go:813 rotate to (binlog.000128, 623251348)
+2025-11-24 21:49:51 INFO rotate to next log from binlog.000128:0 to binlog.000128
+2025-11-24 21:49:51 INFO applier connection validated on 192.168.168.57:3306
+2025-11-24 21:49:51 INFO applier connection validated on 192.168.168.57:3306
+2025-11-24 21:49:51 INFO will use time_zone='SYSTEM' on applier
+2025-11-24 21:49:51 INFO Examining table structure on applier
+2025-11-24 21:49:51 INFO Applier initiated on hli:3306, version 8.0.42
+2025-11-24 21:49:51 INFO Dropping table `a_share_quant`.`_tb_quotation_history_trend_202001_gho`
+2025-11-24 21:49:51 INFO Table dropped
+2025-11-24 21:49:51 INFO Dropping table `a_share_quant`.`_tb_quotation_history_trend_202001_del`
+2025-11-24 21:49:51 INFO Table dropped
+2025-11-24 21:49:51 INFO Dropping table `a_share_quant`.`_tb_quotation_history_trend_202001_ghc`
+2025-11-24 21:49:51 INFO Table dropped
+2025-11-24 21:49:51 INFO Creating changelog table `a_share_quant`.`_tb_quotation_history_trend_202001_ghc`
+2025-11-24 21:49:51 INFO Changelog table created
+2025-11-24 21:49:51 INFO Creating ghost table `a_share_quant`.`_tb_quotation_history_trend_202001_gho`
+2025-11-24 21:49:51 INFO Ghost table created
+2025-11-24 21:49:51 INFO Altering ghost table `a_share_quant`.`_tb_quotation_history_trend_202001_gho`
+2025-11-24 21:49:51 INFO Ghost table altered
+2025-11-24 21:49:51 INFO Intercepted changelog state GhostTableMigrated
+2025-11-24 21:49:51 INFO Waiting for ghost table to be migrated. Current lag is 0s
+2025-11-24 21:49:51 INFO Handled changelog state GhostTableMigrated
+2025-11-24 21:49:51 INFO Chosen shared unique key is PRIMARY
+2025-11-24 21:49:51 INFO Shared columns are wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time
+2025-11-24 21:49:51 INFO Listening on unix socket file: /tmp/gh-ost.a_share_quant.tb_quotation_history_trend_202001.sock
+2025-11-24 21:49:51 INFO Intercepted changelog state ReadMigrationRangeValues
+2025-11-24 21:49:51 INFO Handled changelog state ReadMigrationRangeValues
+2025-11-24 21:49:51 INFO Migration min values: [000001.SZ,2020-01-02 09:25:03]
+2025-11-24 21:49:51 INFO Migration max values: [900957.SH,2020-01-23 15:00:00]
+2025-11-24 21:49:51 INFO Waiting for first throttle metrics to be collected
+2025-11-24 21:49:51 INFO First throttle metrics collected
+# Migrating `a_share_quant`.`tb_quotation_history_trend_202001`; Ghost table is `a_share_quant`.`_tb_quotation_history_trend_202001_gho`
+# Migrating hli:3306; inspecting hli:3306; executing on hli
+# Migration started at Mon Nov 24 21:49:51 +0800 2025
+2025-11-24 21:49:51 INFO Row copy complete
+# chunk-size: 1000; max-lag-millis: 1500ms; dml-batch-size: 10; max-load: ; critical-load: ; nice-ratio: 0.000000
+# Migrating `a_share_quant`.`tb_quotation_history_trend_202001`; Ghost table is `a_share_quant`.`_tb_quotation_history_trend_202001_gho`
+# Migrating hli:3306; inspecting hli:3306; executing on hli
+# Migration started at Mon Nov 24 21:49:51 +0800 2025
+# throttle-additional-flag-file: /tmp/gh-ost.throttle
+# Serving on unix socket: /tmp/gh-ost.a_share_quant.tb_quotation_history_trend_202001.sock
+# chunk-size: 1000; max-lag-millis: 1500ms; dml-batch-size: 10; max-load: ; critical-load: ; nice-ratio: 0.000000
+# throttle-additional-flag-file: /tmp/gh-ost.throttle
+# Serving on unix socket: /tmp/gh-ost.a_share_quant.tb_quotation_history_trend_202001.sock
+Copy: 0/12885383 0.0%; Applied: 0; Backlog: 0/1000; Time: 0s(total), 0s(copy); streamer: binlog.000128:623255295; Lag: 0.02s, HeartbeatLag: 0.02s, State: migrating; ETA: N/A
+2025-11-24 21:49:51 INFO Copy: 0/12885383 0.0%; Applied: 0; Backlog: 0/1000; Time: 0s(total), 0s(copy); streamer: binlog.000128:623255295; Lag: 0.02s, HeartbeatLag: 0.02s, State: migrating; ETA: N/A []
+Copy: 0/0 100.0%; Applied: 0; Backlog: 0/1000; Time: 0s(total), 0s(copy); streamer: binlog.000128:623255295; Lag: 0.02s, HeartbeatLag: 0.02s, State: migrating; ETA: due
+2025-11-24 21:49:51 INFO Copy: 0/0 100.0%; Applied: 0; Backlog: 0/1000; Time: 0s(total), 0s(copy); streamer: binlog.000128:623255295; Lag: 0.02s, HeartbeatLag: 0.02s, State: migrating; ETA: due []
+2025-11-24 21:49:51 INFO Writing changelog state: Migrated
+2025-11-24 21:49:51 INFO New table structure follows
+CREATE TABLE `_tb_quotation_history_trend_202001_gho` (
+  `wind_code` varchar(20) NOT NULL COMMENT '股票代码',
+  `trade_date` datetime NOT NULL COMMENT '交易日期时间',
+  `latest_price` decimal(10,4) DEFAULT NULL COMMENT '最新价',
+  `total_volume` decimal(50,5) DEFAULT NULL,
+  `average_price` decimal(10,4) DEFAULT NULL COMMENT '均价',
+  `status` tinyint NOT NULL DEFAULT '1' COMMENT '数据状态：0.无效, 1.有效(默认)',
+  `create_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `update_time` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  PRIMARY KEY (`wind_code`,`trade_date`),
+  KEY `idx_wind_code` (`wind_code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci COMMENT='行情-历史分时数据表202001'
+[2025/11/24 21:49:51] [info] binlogsyncer.go:206 syncer is closing...
+[2025/11/24 21:49:51] [info] binlogsyncer.go:906 kill last connection id 1045
+[2025/11/24 21:49:51] [info] binlogsyncer.go:236 syncer is closed
+2025-11-24 21:49:51 INFO Closed streamer connection. err=<nil>
+2025-11-24 21:49:51 INFO Dropping table `a_share_quant`.`_tb_quotation_history_trend_202001_ghc`
+2025-11-24 21:49:51 INFO Table dropped
+2025-11-24 21:49:51 INFO Dropping table `a_share_quant`.`_tb_quotation_history_trend_202001_gho`
+2025-11-24 21:49:51 INFO Table dropped
+2025-11-24 21:49:51 INFO Done migrating `a_share_quant`.`tb_quotation_history_trend_202001`
+2025-11-24 21:49:51 INFO Removing socket file: /tmp/gh-ost.a_share_quant.tb_quotation_history_trend_202001.sock
+2025-11-24 21:49:51 INFO Tearing down inspector
+2025-11-24 21:49:51 INFO Tearing down applier
+2025-11-24 21:49:51 INFO Tearing down streamer
+2025-11-24 21:49:51 INFO Tearing down throttler
+# Done
+hli@hli:~$
 ```
 
 
