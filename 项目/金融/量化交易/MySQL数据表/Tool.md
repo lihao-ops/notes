@@ -269,6 +269,13 @@ GRANT ALL PRIVILEGES ON a_share_quant.* TO 'hli_gho'@'%';
 
 #刷新权限
 FLUSH PRIVILEGES;
+
+
+GRANT REPLICATION SLAVE, REPLICATION CLIENT ON *.* TO 'hli_gho'@'%';
+
+GRANT ALL PRIVILEGES ON a_share_quant.* TO 'hli_gho'@'%';
+
+FLUSH PRIVILEGES;
 ```
 
 
