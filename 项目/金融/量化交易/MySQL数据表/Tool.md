@@ -215,6 +215,62 @@ gh-ost \
 
 # 表数据迁移
 
+> **把老表（tb_quotation_history_trend_202001）迁移到新的温表（tb_quotation_history_warm）**
+
+并确保：
+
+- **不阻塞业务写入**
+- **数据可靠迁移**
+- **字段结构差异自动处理**
+- **最终落库到对应的分区（202001 分区）**
+- **支持后续批量迁移其他月表**
+
+
+
+#### 前置步骤
+
+##### ⭐ 第 1 步：确认新目标温表已建好（你已经完成）
+
+确保：
+
+- 主键格式：(id, trade_date)
+- 分区健 = trade_date
+- p202001 分区存在（你也已修复）
+- ROW_FORMAT=COMPRESSED（已 OK）
+
+------
+
+##### ⭐ 第 2 步：选择迁移工具（你已安装 gh-ost）
+
+你现在的技术栈：
+
+- WSL2 Ubuntu
+- 已可连接 GitHub + 外网
+- gh-ost 已成功下载
+
+这是执行在线迁移 **最佳方案**，能确保：
+
+- 迁移时旧表仍可写入
+- binlog 实时同步
+- cutover 原子切换
+
+------
+
+##### ⭐ 第 3 步：为迁移创建专用 MySQL 账号（强烈推荐）
+
+>最小权限：
+
+```sql
+#创建用户hli_gho
+CREATE USER 'hli_gho'@'%' IDENTIFIED BY 'Q836184425';
+
+#授予权限
+GRANT ALL PRIVILEGES ON a_share_quant.* TO 'hli_gho'@'%';
+
+#刷新权限
+FLUSH PRIVILEGES;
+```
+
 
 
 
@@ -222,7 +278,7 @@ gh-ost \
 
 
 ```sql
-接下来我打算将/*
+/*
 SQLyog Professional v12.09 (64 bit)
 MySQL - 8.0.42 : Database - a_share_quant
 *********************************************************************
