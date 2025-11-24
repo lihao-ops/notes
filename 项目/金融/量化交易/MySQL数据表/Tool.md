@@ -273,6 +273,75 @@ FLUSH PRIVILEGES;
 
 
 
+>验证创建
+
+```sql
+C:\Users\lihao>mysql -u hli_gho -p -h 127.0.0.1 -P 3306
+Enter password: **********
+Welcome to the MySQL monitor.  Commands end with ; or \g.
+Your MySQL connection id is 1037
+Server version: 8.0.42 MySQL Community Server - GPL
+
+Copyright (c) 2000, 2025, Oracle and/or its affiliates.
+
+Oracle is a registered trademark of Oracle Corporation and/or its
+affiliates. Other names may be trademarks of their respective
+owners.
+
+Type 'help;' or '\h' for help. Type '\c' to clear the current input statement.
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| a_share_quant      |
+| information_schema |
+| performance_schema |
++--------------------+
+3 rows in set (0.01 sec)
+
+mysql>
+```
+
+创建成功，操作权限a_share_quant
+
+
+
+>测试select权限(旧表)
+
+```sql
+#第 1 步：测试 SELECT 权限（旧表）
+#如果返回数字（比如 30000000 或者类似），说明：
+#✔ 可以读旧月表（历史分表）
+USE a_share_quant;
+
+SELECT COUNT(*) 
+FROM tb_quotation_history_trend_202001 
+LIMIT 1;
+
+
+#第 2 步：测试 INSERT 权限（新温表）
+#不会污染真实数据，因为我们用事务回滚。
+START TRANSACTION;
+
+INSERT INTO tb_quotation_history_warm
+(wind_code, trade_date, latest_price, total_volume, average_price, STATUS)
+VALUES ('TEST123', '2020-01-01 09:30:00', 1.23, 1000, 1.23, 1);
+ROLLBACK;
+
+#第 3 步（可选）：测试 UPDATE/DELETE 权限
+#如果成功UPDATE 权限也正常
+START TRANSACTION;
+UPDATE tb_quotation_history_warm SET STATUS = 0 WHERE wind_code='TEST123';
+ROLLBACK;
+```
+
+
+
+
+
+
+
 
 
 
