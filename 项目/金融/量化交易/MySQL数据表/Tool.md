@@ -473,6 +473,19 @@ hli@hli:~$
 
 
 
+```bash
+sudo apt install percona-toolkit
+```
+
+```bash
+hli@hli:~$ pt-archiver --version
+pt-archiver 3.2.1
+```
+
+
+
+
+
 
 
 
