@@ -721,7 +721,34 @@ CREATE TABLE tb_quotation_history_warm (
 
 
 
->迁移命令
+## 实践迁移
+
+
+
+### 迁移tb_quotation_history_trend_202001到温数据表
+
+
+
+#### 1.字段一致
+
+>将原表新增一个null值的id字段，用于对应一致性，id在温数据表中的具体值会自增
+>
+>解决表字段缺失无法迁移的问题
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202001
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+
+
+#### 2.迁移命令
+
+
+
+### 实践命令
 
 ```bash
 hli@hli:~$ pt-archiver \
@@ -795,7 +822,7 @@ pt-archiver \
 | 事务风险         | ⭐⭐⭐⭐⭐ 你的 `--commit-each` 做得非常好      |
 | 迁移动作可追踪性 | ⭐⭐⭐⭐⭐ `--progress` `--statistics` 信息完整 |
 
-
+属于真实生产环境常用的 **安全归档迁移方案**（行级拷贝、弱影响）
 
 
 
@@ -823,6 +850,10 @@ select          1336    43.8971       1.44
 commit          2672    11.8643       0.39
 other              0   295.3828       9.68
 ```
+
+
+
+> 带注释版本
 
 ```bash
 2025-11-25T18:24:25    3041 13300000
