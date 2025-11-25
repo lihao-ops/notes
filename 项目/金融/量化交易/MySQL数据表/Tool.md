@@ -29,7 +29,7 @@ export https_proxy="http://你的WindowsIP:7890"
 
 ------
 
-### 🧩 二、安装 gh-ost
+### 🧩 二、安装 gh-ost+pt-archiver
 
 #### ① 更新软件源（已完成）
 
