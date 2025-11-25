@@ -828,6 +828,8 @@ pt-archiver \
 
 
 
+#### 3.迁移输出
+
 ```bash
 TIME                ELAPSED   COUNT
 2025-11-25T15:30:30       0       0
@@ -853,7 +855,7 @@ other              0   295.3828       9.68
 
 
 
-> 带注释版本
+##### 带注释版本
 
 ```bash
 2025-11-25T18:24:25    3041 13300000
@@ -907,6 +909,91 @@ commit          2672    11.8643       0.39
 other              0   295.3828       9.68
 # other 包含：生成临时文件、LOAD DATA LOCAL、参数检查等
 # 正常占比，无异常行为
+```
+
+
+
+
+
+#### 4.验证迁移
+
+
+
+##### 验证区间数量
+
+```sql
+#① 目标分区数据量,预期应为 13344002（你原表的数据量）。
+SELECT COUNT(*) FROM tb_quotation_history_warm
+WHERE trade_date >= '2020-01-01' AND trade_date < '2020-02-01';
+```
+
+
+
+##### 验证指定分区数
+
+```sql
+#② 验证分区是否落对,预期应为 13344002（你原表的数据量）。
+SELECT PARTITION_NAME, COUNT(*)
+FROM information_schema.PARTITIONS p
+JOIN tb_quotation_history_warm w
+  ON w.trade_date >= p.PARTITION_DESCRIPTION
+WHERE p.TABLE_NAME = 'tb_quotation_history_warm'
+  AND p.PARTITION_NAME = 'p202001';
+```
+
+
+
+
+
+##### 抽样验证
+
+```sql
+#③ 验证内容一致性（抽样检查）
+SELECT wind_code, trade_date
+FROM tb_quotation_history_trend_202001
+ORDER BY RAND()
+LIMIT 10;
+```
+
+
+
+```sql
+#如果 8 个字段完全一致 → 数据迁移正确。
+SELECT 
+    'SOURCE' AS from_table,
+    t1.*
+FROM tb_quotation_history_trend_202001 t1
+WHERE (t1.wind_code, t1.trade_date) IN (
+    ('300409.SZ', '2020-01-13 10:06:57'),
+    ('601989.SH', '2020-01-10 09:55:57'),
+    ('603356.SH', '2020-01-17 10:07:32'),
+    ('300301.SZ', '2020-01-17 14:29:27'),
+    ('603320.SH', '2020-01-16 13:44:55'),
+    ('000809.SZ', '2020-01-07 09:25:03'),
+    ('300663.SZ', '2020-01-14 14:11:57'),
+    ('002475.SZ', '2020-01-07 11:18:57'),
+    ('002581.SZ', '2020-01-16 11:29:54'),
+    ('600266.SH', '2020-01-09 14:50:58')
+)
+
+UNION ALL
+
+SELECT 
+    'WARM' AS from_table,
+    t2.*
+FROM tb_quotation_history_warm t2
+WHERE (t2.wind_code, t2.trade_date) IN (
+    ('300409.SZ', '2020-01-13 10:06:57'),
+    ('601989.SH', '2020-01-10 09:55:57'),
+    ('603356.SH', '2020-01-17 10:07:32'),
+    ('300301.SZ', '2020-01-17 14:29:27'),
+    ('603320.SH', '2020-01-16 13:44:55'),
+    ('000809.SZ', '2020-01-07 09:25:03'),
+    ('300663.SZ', '2020-01-14 14:11:57'),
+    ('002475.SZ', '2020-01-07 11:18:57'),
+    ('002581.SZ', '2020-01-16 11:29:54'),
+    ('600266.SH', '2020-01-09 14:50:58')
+);
 ```
 
 
