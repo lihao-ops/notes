@@ -623,6 +623,42 @@ CREATE TABLE tb_quotation_history_warm (
 
 
 
+>迁移命令
+
+```sql
+hli@hli:~$ pt-archiver \
+  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202001,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2020-01-01' AND trade_date < '2020-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+```bash
+TIME                ELAPSED   COUNT
+2025-11-25T15:30:30       0       0
+2025-11-25T15:30:36       5   20000
+2025-11-25T15:30:42      11   40000
+...
+2025-11-25T16:22:07    3097 13344002
+Started at 2025-11-25T15:30:30, ended at 2025-11-25T16:22:07
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.225.7,p=...,t=tb_quotation_history_trend_202001,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.225.7,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 13344002
+INSERT 13344002
+DELETE 0
+Action         Count       Time        Pct
+inserting   13344002  2761.2815      89.16
+select          1336    45.3955       1.47
+commit          2672    13.1644       0.43
+other              0   277.1847       8.95
+```
+
 
 
 
