@@ -748,7 +748,7 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 
 
-### 实践命令
+##### 实践命令
 
 ```bash
 hli@hli:~$ pt-archiver \
@@ -764,7 +764,7 @@ hli@hli:~$ pt-archiver \
   --statistics
 ```
 
->带注释版本
+###### 带注释版本
 
 ```bash
 pt-archiver \
