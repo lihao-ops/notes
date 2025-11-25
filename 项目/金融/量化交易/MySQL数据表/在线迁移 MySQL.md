@@ -1113,15 +1113,9 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 
 
+##### 2020
 
-
-#### 修改命令继续适配新表与新分区
-
-
-
-#### 2020
-
-##### 202002
+###### 202002
 
 >修改tb_quotation_history_trend_202002
 >
@@ -1143,7 +1137,7 @@ pt-archiver \
 
 
 
-##### 202003
+###### 202003
 
 ```bash
 pt-archiver \
@@ -1163,7 +1157,7 @@ pt-archiver \
 
 
 
-##### 202004
+###### 202004
 
 ```bash
 pt-archiver \
@@ -1181,7 +1175,7 @@ pt-archiver \
 
 
 
-##### 202005
+###### 202005
 
 ```bash
 pt-archiver \
@@ -1199,7 +1193,7 @@ pt-archiver \
 
 
 
-##### 202006
+###### 202006
 
 ```bash
 pt-archiver \
@@ -1217,7 +1211,7 @@ pt-archiver \
 
 
 
-##### 202007
+###### 202007
 
 ```bash
 pt-archiver \
@@ -1235,7 +1229,7 @@ pt-archiver \
 
 
 
-##### 202008
+###### 202008
 
 ```bash
 pt-archiver \
@@ -1253,7 +1247,7 @@ pt-archiver \
 
 
 
-##### 202009
+###### 202009
 
 ```bash
 pt-archiver \
@@ -1271,7 +1265,7 @@ pt-archiver \
 
 
 
-##### 202010
+###### 202010
 
 ```bash
 pt-archiver \
@@ -1291,7 +1285,7 @@ pt-archiver \
 
 
 
-##### 202011
+###### 202011
 
 ```bash
 pt-archiver \
@@ -1309,7 +1303,7 @@ pt-archiver \
 
 
 
-##### 202012
+###### 202012
 
 ```bash
 pt-archiver \
@@ -1327,7 +1321,7 @@ pt-archiver \
 
 
 
-#### 2021
+##### 2021
 
 
 
