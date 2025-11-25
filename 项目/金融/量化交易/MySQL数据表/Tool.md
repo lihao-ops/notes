@@ -289,29 +289,11 @@ FLUSH PRIVILEGES;
 
 
 
-## 表数据迁移
-
-> **把老表（tb_quotation_history_trend_202001）迁移到新的温表（tb_quotation_history_warm）**
-
-并确保：
-
-- **不阻塞业务写入**
-- **数据可靠迁移**
-- **字段结构差异自动处理**
-- **最终落库到对应的分区（202001 分区）**
-- **支持后续批量迁移其他月表**
-
-
-
-### 
 
 
 
 
 
-
-
-# 表数据迁移
 
 > **把老表（tb_quotation_history_trend_202001）迁移到新的温表（tb_quotation_history_warm）**
 
@@ -588,6 +570,28 @@ pt-archiver 3.2.1
 
 
 
+
+
+
+
+
+
+
+
+
+
+
+
+## 关键表结构
+
+
+
+### 待迁移表
+
+
+
+#### tb_quotation_history_trend_202001
+
 ```sql
 /*
 SQLyog Professional v12.09 (64 bit)
@@ -619,6 +623,12 @@ CREATE TABLE `tb_quotation_history_trend_202001` (
 ```
 
 
+
+
+
+### 新表结构
+
+#### 温数据表tb_quotation_history_warm
 
 ```sql
 USE `a_share_quant`;
@@ -722,6 +732,18 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 ## 实践迁移
+
+
+
+> **把老表（tb_quotation_history_trend_202001）迁移到新的温表（tb_quotation_history_warm）**
+
+并确保：
+
+- **不阻塞业务写入**
+- **数据可靠迁移**
+- **字段结构差异自动处理**
+- **最终落库到对应的分区（202001 分区）**
+- **支持后续批量迁移其他月表**
 
 
 
