@@ -45,11 +45,21 @@ sudo apt install wget -y
 
 #### ③ 下载 gh-ost 最新版本（已完成）
 
-你执行的是：
+>官网地址
+
+```http
+https://github.com/github/gh-ost/releases
+```
+
+
+
+> 你执行的是
 
 ```bash
 wget https://github.com/github/gh-ost/releases/download/v1.1.7/gh-ost-binary-linux-amd64-20241219160321.tar.gz -O gh-ost.tar.gz
 ```
+
+
 
 #### ④ 解压
 
@@ -195,6 +205,10 @@ gh-ost \
 
 ## 创建迁移用户
 
+
+
+### 创建 pt-archiver 迁移专用账号
+
 ```sql
 # ============================================================
 # 创建 pt-archiver 迁移专用账号（只创建一次即可）
@@ -202,8 +216,13 @@ gh-ost \
 # 作用：为数据迁移提供独立账号，避免使用 root，降低风险。
 # '%' 表示允许任意 IP（你需要从 WSL 连过去，所以必须用 '%'）
 CREATE USER 'hli_gho'@'%' IDENTIFIED BY 'Q836184425';
+```
 
 
+
+### 授予权限
+
+```sql
 # ============================================================
 # 授予权限（针对 a_share_quant 库）
 # ============================================================
@@ -212,14 +231,28 @@ CREATE USER 'hli_gho'@'%' IDENTIFIED BY 'Q836184425';
 #      但你运行时使用 --no-delete，实际不会删除。
 GRANT ALL PRIVILEGES ON a_share_quant.* TO 'hli_gho'@'%';
 
+```
 
+
+
+### 刷新权限（权限变更必须执行）
+
+```sql
 # ============================================================
 # 刷新权限（权限变更必须执行）
 # ============================================================
 FLUSH PRIVILEGES;
+```
 
 
 
+### 验证权限
+
+
+
+#### 1.测试 SELECT 权限（验证能读旧表）
+
+```sql
 # ============================================================
 # 第 1 步：测试 SELECT 权限（验证能读旧表）
 # ============================================================
@@ -230,6 +263,12 @@ USE a_share_quant;
 SELECT COUNT(*) 
 FROM tb_quotation_history_trend_202001 
 LIMIT 1;
+```
+
+
+
+```sql
+
 
 
 
@@ -954,13 +993,9 @@ WHERE trade_date >= '2020-01-01' AND trade_date < '2020-02-01';
 ##### 验证指定分区数
 
 ```sql
-#② 验证分区是否落对,预期应为 13344002（你原表的数据量）。
-SELECT PARTITION_NAME, COUNT(*)
-FROM information_schema.PARTITIONS p
-JOIN tb_quotation_history_warm w
-  ON w.trade_date >= p.PARTITION_DESCRIPTION
-WHERE p.TABLE_NAME = 'tb_quotation_history_warm'
-  AND p.PARTITION_NAME = 'p202001';
+#② 验证分区是否落对,预期应为 13344002（你原表的数据量）。官方推荐的分区计数方法
+SELECT COUNT(*)
+FROM tb_quotation_history_warm PARTITION (p202001);
 ```
 
 
