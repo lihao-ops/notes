@@ -1,18 +1,18 @@
 
 
-# ✅ WSL2 + gh-ost 在线迁移 MySQL 表 —— 大厂级步骤总结
+## WSL2 + gh-ost 在线迁移 MySQL 表
 
 以下步骤已经按最佳实践整理，被 DBA、架构师普遍认可。
 
 ------
 
-# 🧩 **一、准备环境**
+### 🧩 **一、准备环境**
 
-### ① 开启 WSL2（已完成）
+#### ① 开启 WSL2（已完成）
 
-### ② 安装 Ubuntu（已完成）
+#### ② 安装 Ubuntu（已完成）
 
-### ③ 配置 WSL2 代理，让 WSL2 能访问外网（已完成）
+#### ③ 配置 WSL2 代理，让 WSL2 能访问外网（已完成）
 
 核心命令：
 
@@ -23,21 +23,21 @@ export https_proxy="http://你的WindowsIP:7890"
 
 ------
 
-# 🧩 **二、安装 gh-ost**
+### 🧩 二、安装 gh-ost
 
-### ① 更新软件源（已完成）
+#### ① 更新软件源（已完成）
 
 ```bash
 sudo apt update
 ```
 
-### ② 安装 wget（已完成）
+#### ② 安装 wget（已完成）
 
 ```bash
 sudo apt install wget -y
 ```
 
-### ③ 下载 gh-ost 最新版本（已完成）
+#### ③ 下载 gh-ost 最新版本（已完成）
 
 你执行的是：
 
@@ -45,20 +45,20 @@ sudo apt install wget -y
 wget https://github.com/github/gh-ost/releases/download/v1.1.7/gh-ost-binary-linux-amd64-20241219160321.tar.gz -O gh-ost.tar.gz
 ```
 
-### ④ 解压
+#### ④ 解压
 
 ```bash
 tar -xzf gh-ost.tar.gz
 ```
 
-### ⑤ 安装到全局路径
+#### ⑤ 安装到全局路径
 
 ```bash
 sudo mv gh-ost /usr/local/bin/
 sudo chmod +x /usr/local/bin/gh-ost
 ```
 
-### ⑥ 验证是否成功
+#### ⑥ 验证是否成功
 
 ```bash
 gh-ost --version
@@ -66,11 +66,11 @@ gh-ost --version
 
 ------
 
-# 🧩 **三、准备迁移配置**
+### 🧩 三、准备迁移配置
 
 gh-ost 使用中需要 3 个核心点：
 
-### ① MySQL 账号必须具备以下权限：
+#### ① MySQL 账号必须具备以下权限：
 
 ```
 replication client
@@ -87,7 +87,7 @@ delete
 
 ------
 
-### ② 旧表（source table）
+#### ② 旧表（source table）
 
 例如：
 
@@ -95,7 +95,7 @@ delete
 tb_quotation_history_trend_202001
 ```
 
-### ③ 新表（target table）
+#### ③ 新表（target table）
 
 你已经建好了分区表：
 
@@ -105,7 +105,7 @@ tb_quotation_history_hot
 
 ------
 
-# 🧩 **四、执行在线迁移（核心步骤）**
+### 🧩 **四、**执行在线迁移**（核心步骤）**
 
 下面是最关键的步骤：
  gh-ost 会在迁移过程中：
@@ -144,62 +144,19 @@ gh-ost \
 
 ------
 
-# 🧩 **五、迁移完成后验证**
+### 🧩 五、迁移完成后验证
 
 迁移完成后做 3 件事：
 
-### ① 校验目标分区表记录数
+#### ① 校验目标分区表记录数
 
 检查是否一致。
 
-### ② 检查业务查询是否正常命中新表
+#### ② 检查业务查询是否正常命中新表
 
-### ③ 保留 gh-ost 日志用于审计（大厂都要求）
-
-------
-
-# 🧩 **六、后续可自动化**
-
-迁移一张表可以手工执行；
- 但迁移 24 张月表，你可以考虑做：
-
-- SpringBoot + ProcessBuilder 调 gh-ost
-- 或者做一个 Shell 循环迁移脚本
-- 或者做 CI/CD 一键迁移 pipeline
-
-我可以帮你写自动批处理脚本。
+#### ③ 保留 gh-ost 日志用于审计（大厂都要求）
 
 ------
-
-# ⭐ 总结一句话
-
-> **你现在环境已经完全 ready**，只差最后一步：
->  👉 生成适合你业务、你的表名、你的需要的 **完整 gh-ost 实际迁移命令**
->  然后执行即可。
-
-------
-
-# 🔥 现在下一步怎么走？
-
-我建议你告诉我：
-
-### 👉「我要迁移的旧表名是什么？目标新表是哪张？迁移只改变表结构还是改变数据布局？」
-
-例如：
-
-```
-旧表：tb_quotation_history_trend_202001  
-新表：tb_quotation_history_hot  
-需求：迁移所有数据，字段完全一致
-```
-
-我就能给你：
-
-### **✔ 一条能直接复制执行的 gh-ost 迁移命令**
-
-### **✔ 外加 cutover 期间注意事项（非常关键）**
-
-你发我表名，我立刻帮你生成。
 
 
 
