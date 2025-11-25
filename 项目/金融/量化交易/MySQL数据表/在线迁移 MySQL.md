@@ -1179,15 +1179,111 @@ pt-archiver \
 
 
 
+#### 202005
+
+```bash
+pt-archiver \
+  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202005,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2020-05-01' AND trade_date < '2020-06-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
 
 
 
+#### 202006
+
+```bash
+pt-archiver \
+  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202006,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2020-06-01' AND trade_date < '2020-07-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
 
 
 
+#### 202007
+
+```bash
+pt-archiver \
+  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202007,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2020-07-01' AND trade_date < '2020-08-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
 
 
 
+#### 202008
+
+```bash
+pt-archiver \
+  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202008,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2020-08-01' AND trade_date < '2020-09-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+#### 202009
+
+```bash
+pt-archiver \
+  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202009,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2020-09-01' AND trade_date < '2020-10-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+#### 202010
+
+```bash
+pt-archiver \
+  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202010,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2020-10-01' AND trade_date < '2020-11-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
 
 
 
