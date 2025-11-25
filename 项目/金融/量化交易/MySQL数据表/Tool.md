@@ -629,16 +629,16 @@ USE `a_share_quant`;
 
 DROP TABLE IF EXISTS tb_quotation_history_warm;
 
-CREATE TABLE tb_quotation_history_warm (
-    id BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键ID',
-    wind_code VARCHAR(20) NOT NULL COMMENT '股票代码（如：000001.SZ）',
-    trade_date DATETIME NOT NULL COMMENT '交易时间（秒级精度）',
-    latest_price DECIMAL(10,4) DEFAULT NULL COMMENT '最新价格',
-    total_volume decimal(50,5) DEFAULT NULL COMMENT '总成交量',
-    average_price DECIMAL(10,4) DEFAULT NULL COMMENT '均价',
-    STATUS TINYINT NOT NULL DEFAULT 1 COMMENT '数据状态：0=无效, 1=有效',
-    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
-    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+CREATE TABLE `tb_quotation_history_warm` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '自增主键ID',
+  `wind_code` VARCHAR(20) NOT NULL COMMENT '股票代码（如：000001.SZ）',
+  `trade_date` DATETIME NOT NULL COMMENT '交易时间（秒级精度）',
+  `latest_price` DECIMAL(10,4) DEFAULT NULL COMMENT '最新价格',
+  `total_volume` DECIMAL(50,5) DEFAULT NULL COMMENT '总成交量',
+  `average_price` DECIMAL(10,4) DEFAULT NULL COMMENT '均价',
+  `status` TINYINT NOT NULL DEFAULT '1' COMMENT '数据状态：0=无效, 1=有效',
+  `create_time` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+  `update_time` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
     
     PRIMARY KEY (id, trade_date),
     UNIQUE KEY uniq_windcode_tradedate (wind_code, trade_date)
