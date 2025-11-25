@@ -725,7 +725,7 @@ CREATE TABLE tb_quotation_history_warm (
 
 
 
-### 迁移tb_quotation_history_trend_202001到温数据表
+### 迁移tb_quotation_history_trend到温数据表
 
 
 
@@ -997,6 +997,43 @@ WHERE (t2.wind_code, t2.trade_date) IN (
 ```
 
 
+
+
+
+#### 5.继续剩余迁移
+
+
+
+##### 新增空id字段对应表字段一致
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202002
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+
+
+##### 修改命令适配新表与新分区
+
+>修改tb_quotation_history_trend_202002
+>
+>修改trade_date >= '2020-02-01' AND trade_date < '2020-03-01
+
+```bash
+pt-archiver \
+  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202002,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2020-02-01' AND trade_date < '2020-03-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
 
 
 
