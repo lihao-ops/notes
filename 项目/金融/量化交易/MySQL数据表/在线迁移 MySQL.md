@@ -1403,7 +1403,6 @@ pt-archiver \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "trade_date >= '2020-04-01' AND trade_date < '2020-05-01'" \
   --limit 100000 \
-  --commit-each \
   --progress 20000 \
   --no-delete \
   --charset utf8 \
