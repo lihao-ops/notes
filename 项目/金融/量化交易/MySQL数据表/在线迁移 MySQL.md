@@ -1554,8 +1554,6 @@ ALTER TABLE tb_quotation_history_trend_202007
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
 
-
-
 ```bash
 pt-archiver \
   --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202007,u=hli_gho,p=Q836184425 \
@@ -1568,6 +1566,23 @@ pt-archiver \
   --no-delete \
   --charset utf8 \
   --statistics
+```
+
+```bash
+2025-11-26T18:00:36    4893 20300000
+2025-11-26T18:00:41    4898 20320000
+2025-11-26T18:00:43    4900 20327555
+Started at 2025-11-26T16:39:02, ended at 2025-11-26T18:00:43
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.225.7,p=...,t=tb_quotation_history_trend_202007,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.225.7,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 20327555
+INSERT 20327555
+DELETE 0
+Action         Count       Time        Pct
+inserting   20327555  4382.8504      89.44
+select          2034    61.4133       1.25
+commit          4068    22.6237       0.46
+other              0   433.4679       8.85
 ```
 
 
