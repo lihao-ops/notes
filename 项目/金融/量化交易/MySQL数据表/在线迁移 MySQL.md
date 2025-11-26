@@ -1362,6 +1362,13 @@ other              0   360.5891       9.03
 
 ###### 202003
 
+```sql
+ALTER TABLE tb_quotation_history_trend_202003
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
 ```bash
 pt-archiver \
   --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202003,u=hli_gho,p=Q836184425 \
