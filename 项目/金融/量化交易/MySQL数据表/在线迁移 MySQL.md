@@ -1526,9 +1526,35 @@ pt-archiver \
   --statistics
 ```
 
+```bash
+2025-11-26T15:31:01    3878 17040000
+2025-11-26T15:31:02    3879 17044305
+Started at 2025-11-26T14:26:23, ended at 2025-11-26T15:31:02
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.225.7,p=...,t=tb_quotation_history_trend_202006,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.225.7,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 17044305
+INSERT 17044305
+DELETE 0
+Action         Count       Time        Pct
+inserting   17044305  3473.6490      89.54
+select          1706    51.1215       1.32
+commit          3412    15.9157       0.41
+other              0   338.6275       8.73
+hli@hli:~$
+```
+
+
+
 
 
 ###### 202007
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202007
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
 
 ```bash
 pt-archiver \
