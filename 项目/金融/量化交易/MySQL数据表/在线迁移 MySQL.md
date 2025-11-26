@@ -1462,8 +1462,6 @@ ALTER TABLE tb_quotation_history_trend_202005
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
 
-
-
 ```bash
 pt-archiver \
   --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202005,u=hli_gho,p=Q836184425 \
@@ -1477,6 +1475,12 @@ pt-archiver \
   --charset utf8 \
   --statistics
 ```
+
+
+
+
+
+
 
 
 
