@@ -1389,13 +1389,20 @@ pt-archiver \
 
 ###### 202004
 
+```sql
+ALTER TABLE tb_quotation_history_trend_202004
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
 ```bash
 pt-archiver \
   --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202004,u=hli_gho,p=Q836184425 \
   --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "trade_date >= '2020-04-01' AND trade_date < '2020-05-01'" \
-  --limit 10000 \
+  --limit 100000 \
   --commit-each \
   --progress 20000 \
   --no-delete \
