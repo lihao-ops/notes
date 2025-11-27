@@ -2514,6 +2514,29 @@ pt-archiver \
 
 
 
+```bash
+2025-11-27T14:44:55    5730 21040000
+2025-11-27T14:45:00    5736 21060000
+2025-11-27T14:45:01    5737 21062909
+Started at 2025-11-27T13:09:24, ended at 2025-11-27T14:45:01
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_trend_202012,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 21062909
+INSERT 21062909
+DELETE 0
+Action         Count       Time        Pct
+inserting   21062909  5050.9944      88.04
+select          2108   131.6678       2.29
+commit          4216    32.5790       0.57
+other              0   522.2369       9.10
+```
+
+
+
+
+
+
+
 ##### 2021
 
 
@@ -2653,9 +2676,30 @@ pt-archiver \
 
 
 
+###### 202106
 
 
 
+```sql
+ALTER TABLE tb_quotation_history_trend_202106
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202106,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2021-06-01' AND trade_date < '2021-07-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
 
 
 
