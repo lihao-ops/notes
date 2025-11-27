@@ -10,6 +10,51 @@
 
 
 
+
+
+## 官网地址
+
+这是这两个工具的官方地址。在面试或写文档时，引用官方文档是最权威的。
+
+
+
+### 1. pt-archiver
+
+
+
+它是 **Percona Toolkit** 工具包的一部分，没有独立的官网，而是包含在 Percona 的官方文档中。
+
+- **官方文档 (最权威参数手册):**
+  - https://docs.percona.com/percona-toolkit/pt-archiver.html
+  - *查阅建议：* 遇到不确定的参数（如 `--sleep`, `--txn-size`, `--limit`），直接看这里，Percona 的文档写得非常详细。
+- **Percona Toolkit 产品主页:**
+  - https://www.percona.com/software/database-tools/percona-toolkit
+
+------
+
+
+
+### 2. gh-ost
+
+
+
+它是 GitHub 开源的项目，所以它的“官网”就是它的 GitHub 代码仓库。
+
+- **GitHub 官方仓库 (代码 & 文档):**
+  - https://github.com/github/gh-ost
+  - *查阅建议：* 在仓库的 `README.md` 中有非常详细的架构图和原理说明。
+  - 特别是它的 **Cheat Sheet (速查表)** 非常有用：[gh-ost Cheat Sheet](https://www.google.com/search?q=https://github.com/github/gh-ost/blob/master/doc/cheatsheet.md)
+
+------
+
+💡 建议：
+
+如果你在简历或文档中提到这两个工具，建议收藏这两个地址。特别是 pt-archiver 的官方文档，里面有很多关于 --safe-update 和 --retries 等隐蔽参数的说明，面试官如果问得深，答案往往都在文档的细节里。
+
+
+
+
+
 ## 高并发下迁移方案
 
 ### 方案流程图
