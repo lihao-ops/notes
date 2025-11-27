@@ -2374,16 +2374,42 @@ pt-archiver \
 
 
 
+```bash
+2025-11-27T11:59:13    4408 19700000
+2025-11-27T11:59:17    4412 19718428
+Started at 2025-11-27T10:45:44, ended at 2025-11-27T11:59:17
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_trend_202009,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 19718428
+INSERT 19718428
+DELETE 0
+Action         Count       Time        Pct
+inserting   19718428  3932.8474      89.13
+select          1973    60.1436       1.36
+commit          3946    18.8299       0.43
+other              0   400.5597       9.08
+hli@hli:~$
+```
+
+
+
 
 
 
 
 ###### 202010
 
+```sql
+ALTER TABLE tb_quotation_history_trend_202010
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
 ```bash
 pt-archiver \
-  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202010,u=hli_gho,p=Q836184425 \
-  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202010,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "trade_date >= '2020-10-01' AND trade_date < '2020-11-01'" \
   --limit 10000 \
@@ -2400,10 +2426,17 @@ pt-archiver \
 
 ###### 202011
 
+```sql
+ALTER TABLE tb_quotation_history_trend_202011
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
 ```bash
 pt-archiver \
-  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202011,u=hli_gho,p=Q836184425 \
-  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202011,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "trade_date >= '2020-11-01' AND trade_date < '2020-12-01'" \
   --limit 10000 \
@@ -2418,10 +2451,17 @@ pt-archiver \
 
 ###### 202012
 
+```sql
+ALTER TABLE tb_quotation_history_trend_202012
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
 ```bash
 pt-archiver \
-  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202012,u=hli_gho,p=Q836184425 \
-  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202012,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "trade_date >= '2020-12-01' AND trade_date < '2021-01-01'" \
   --limit 10000 \
