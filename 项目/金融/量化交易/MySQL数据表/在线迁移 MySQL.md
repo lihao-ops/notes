@@ -2658,6 +2658,25 @@ pt-archiver \
 
 
 
+```bash
+2025-11-27T16:27:32    6686 21580000
+2025-11-27T16:27:38    6693 21600000
+2025-11-27T16:27:44    6698 21614541
+Started at 2025-11-27T14:36:05, ended at 2025-11-27T16:27:44
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_trend_202103,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 21614541
+INSERT 21614541
+DELETE 0
+Action         Count       Time        Pct
+inserting   21614541  5866.1423      87.57
+select          2163   204.3729       3.05
+commit          4326    56.4938       0.84
+other              0   572.0985       8.54
+```
+
+
+
 
 
 ###### 202104
@@ -2685,14 +2704,35 @@ pt-archiver \
 
 
 
+```bash
+2025-11-27T16:33:41    6335 19900000
+2025-11-27T16:33:48    6342 19920000
+2025-11-27T16:33:49    6343 19922786
+Started at 2025-11-27T14:48:06, ended at 2025-11-27T16:33:49
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_trend_202104,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 19922786
+INSERT 19922786
+DELETE 0
+Action         Count       Time        Pct
+inserting   19922786  5543.7186      87.39
+select          1994   195.3621       3.08
+commit          3988    54.2119       0.85
+other              0   550.1400       8.67
+```
+
+
+
+
+
+
+
 ###### 202105
 
 ```sql
 ALTER TABLE tb_quotation_history_trend_202105
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
-
-
 
 ```bash
 pt-archiver \
@@ -2706,6 +2746,25 @@ pt-archiver \
   --no-delete \
   --charset utf8 \
   --statistics
+```
+
+
+
+```bash
+2025-11-27T16:20:01    5435 17220000
+2025-11-27T16:20:08    5442 17240000
+2025-11-27T16:20:10    5444 17245842
+Started at 2025-11-27T14:49:25, ended at 2025-11-27T16:20:10
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_trend_202105,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 17245842
+INSERT 17245842
+DELETE 0
+Action         Count       Time        Pct
+inserting   17245842  4763.7459      87.49
+select          1726   166.9538       3.07
+commit          3452    45.0741       0.83
+other              0   468.8758       8.61
 ```
 
 
@@ -2839,9 +2898,55 @@ pt-archiver \
 
 
 
+###### 202111
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202111
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
 
 
 
+```bash
+pt-archiver \
+  --source h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202111,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2021-11-01' AND trade_date < '2021-12-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+###### 202112
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202112
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202112,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2021-12-01' AND trade_date < '2022-01-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
 
 
 
