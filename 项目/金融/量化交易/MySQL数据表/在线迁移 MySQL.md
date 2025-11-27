@@ -29,88 +29,70 @@
 
 ```mermaid
 graph TD
-    %% ==========================================
-    %% 阶段一：双写机制 (Forward Compatibility)
-    %% ==========================================
-    Start((开始迁移)) --> Phase1_Init[1. 初始化: 建新表/索引]
-    Phase1_Init --> Phase1_DW[部署双写: 开启双写机制]
+    %% 阶段一
+    Start(开始迁移) --> Phase1_Init[1.初始化: 建表与索引]
+    Phase1_Init --> Phase1_DW[2.部署: 开启双写机制]
     
-    subgraph SG_DoubleWrite [阶段一: 业务双写逻辑 (核心防竞态)]
-        direction TB
-        DW_Req(业务写入请求) --> DW_Old[写旧表: Insert/Update/Delete]
+    subgraph Phase1_DoubleWrite
+        DW_Req(业务写入) --> DW_Old[写旧表]
         DW_Req --> DW_New_Logic{操作类型?}
         
-        DW_New_Logic -- Insert --> DW_Ins[新表: Insert]
-        DW_New_Logic -- Delete --> DW_Del[新表: Delete]
-        
-        %% 核心亮点：Update转Upsert
-        DW_New_Logic -- Update --> DW_Upd[新表: INSERT ON DUPLICATE KEY UPDATE]
+        DW_New_Logic -- Insert --> DW_Ins[新表:Insert]
+        DW_New_Logic -- Delete --> DW_Del[新表:Delete]
+        DW_New_Logic -- Update --> DW_Upd[新表:Upsert]
         
         DW_Ins --> DW_End(双写完成)
         DW_Del --> DW_End
         DW_Upd --> DW_End
     end
     
-    Phase1_DW --> SG_DoubleWrite
+    Phase1_DW --> DW_Req
 
-    %% ==========================================
-    %% 阶段二：存量回填 (Backfill)
-    %% ==========================================
-    SG_DoubleWrite -.-> Phase2_Start
+    %% 阶段二
+    DW_End -.-> Phase2_Start(启动 pt-archiver)
     
-    subgraph SG_Backfill [阶段二: 存量历史数据回填]
-        direction TB
-        Phase2_Start(启动 pt-archiver) --> Phase2_Read[源表读取: Limit 1000 / MVCC快照]
+    subgraph Phase2_Backfill
+        Phase2_Start --> Phase2_Read[源表读取]
         Phase2_Read --> Phase2_Write{写入新表}
         
-        %% 核心亮点：INSERT IGNORE
-        Phase2_Write -- 遇到主键冲突 --> Phase2_Ignore[INSERT IGNORE: 忽略写入]
-        Phase2_Write -- 无冲突 --> Phase2_Commit[写入并 Commit]
+        Phase2_Write -- 主键冲突 --> Phase2_Ignore[INSERT IGNORE]
+        Phase2_Write -- 无冲突 --> Phase2_Commit[写入并提交]
         
-        Phase2_Ignore -.-> |保护双写最新数据| Phase2_Sleep
-        Phase2_Commit --> Phase2_Sleep[Sleep 0.5s: 防止主从延迟]
+        Phase2_Ignore -.-> Phase2_Sleep
+        Phase2_Commit --> Phase2_Sleep[Sleep 0.5s]
         
-        Phase2_Sleep --> Phase2_Loop{是否完成?}
-        Phase2_Loop -- 未完成 --> Phase2_Read
-        Phase2_Loop -- 已完成 --> Phase2_Done(全量回填结束)
+        Phase2_Sleep --> Phase2_Loop{是否完成}
+        Phase2_Loop -- No --> Phase2_Read
+        Phase2_Loop -- Yes --> Phase2_Done(回填结束)
     end
 
-    %% ==========================================
-    %% 阶段三：一致性验证 (Verification)
-    %% ==========================================
-    Phase2_Done --> Phase3_Start
+    %% 阶段三
+    Phase2_Done --> Phase3_Start(验证开始)
     
-    subgraph SG_Verify [阶段三: 多维一致性验证]
-        direction TB
-        Phase3_Start(验证开始)
+    subgraph Phase3_Verify
+        Phase3_Start --> Phase3_Method{验证方式}
         
-        %% 分支A: Python后台脚本
-        Phase3_Py[A. Python脚本: 逐行比对] --> Phase3_Py_Logic[读旧表 vs 读新表]
-        Phase3_Py_Logic -- 不一致 --> Phase3_Repair_A[以旧表为准: 修复新表]
+        Phase3_Method -- 脚本 --> Phase3_Py[Python全量比对]
+        Phase3_Py --> Phase3_Repair_A[以旧修复新]
         
-        %% 分支B: 线上影子读
-        Phase3_Shadow[B. 业务影子读: 1% 流量采样] --> Phase3_Shadow_Comp{内存异步对比}
-        Phase3_Shadow_Comp -- 不一致 --> Phase3_Repair_B[Read Repair: 触发修复]
-        Phase3_Shadow_Comp -- 一致 --> Phase3_Log[记录验证通过]
+        Phase3_Method -- 线上 --> Phase3_Shadow[业务影子读]
+        Phase3_Shadow --> Phase3_Repair_B[读时修复]
     end
 
-    %% ==========================================
-    %% 阶段四：灰度切流 (Cutover)
-    %% ==========================================
-    SG_Verify -.-> Phase4_Start
+    %% 阶段四
+    Phase3_Repair_A -.-> Phase4_Start
+    Phase3_Repair_B -.-> Phase4_Start
     
-    subgraph SG_Cutover [阶段四: 灰度切读 & 下线]
-        direction TB
-        Phase4_Start(配置中心: 开启灰度读) --> Phase4_Gray{读流量比例}
+    subgraph Phase4_Cutover
+        Phase4_Start(开启灰度) --> Phase4_Gray{流量比例}
+        Phase4_Gray -- 100% --> Phase4_ReadNew[全量读新表]
+        Phase4_ReadNew --> Phase4_Monitor{观察一周}
         
-        Phase4_Gray -- 1% -> 50% -> 100% --> Phase4_ReadNew[全量读新表]
-        Phase4_ReadNew --> Phase4_Monitor{观察一周?}
-        
-        Phase4_Monitor -- 异常 --> Phase4_Rollback[秒级回滚: 切回读旧表]
-        Phase4_Monitor -- 稳定 --> Phase4_StopDW[下线双写 & 清理旧表]
+        Phase4_Monitor -- 异常 --> Phase4_Rollback[秒级回滚]
+        Phase4_Monitor -- 稳定 --> Phase4_StopDW[下线双写]
     end
     
-    Phase4_StopDW --> End((迁移成功))
+    Phase4_StopDW --> End(迁移成功)
 ```
 
 
