@@ -1836,6 +1836,20 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 
 
+##### 查找对应的IP
+
+>一定要适配正确IP，这里是10.100.224.255 
+
+```bash
+无线局域网适配器 WLAN: 连接特定的 DNS 后缀 . . . . . . . : 
+本地链接 IPv6 地址. . . . . . . . : fe80::dd5e:6eb9:a14f:28c%10 
+IPv4 地址 . . . . . . . . . . . . : 10.100.224.255 
+子网掩码 . . . . . . . . . . . . : 255.255.248.0 
+默认网关. . . . . . . . . . . . . : 10.100.224.1
+```
+
+
+
 ##### 2020
 
 ###### 202002
@@ -2169,8 +2183,8 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 ```bash
 pt-archiver \
-  --source h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202009,u=hli_gho,p=Q836184425 \
-  --dest   h=10.100.225.7,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202009,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "trade_date >= '2020-09-01' AND trade_date < '2020-10-01'" \
   --limit 10000 \
@@ -2180,6 +2194,10 @@ pt-archiver \
   --charset utf8 \
   --statistics
 ```
+
+
+
+
 
 
 
