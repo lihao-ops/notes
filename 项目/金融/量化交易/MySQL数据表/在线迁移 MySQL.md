@@ -2566,6 +2566,25 @@ pt-archiver \
 
 
 
+```bash
+2025-11-27T16:07:43    5781 18520000
+2025-11-27T16:07:49    5787 18540000
+2025-11-27T16:07:50    5787 18542592
+Started at 2025-11-27T14:31:22, ended at 2025-11-27T16:07:50
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_trend_202101,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 18542592
+INSERT 18542592
+DELETE 0
+Action         Count       Time        Pct
+inserting   18542592  5066.3477      87.53
+select          1856   168.5592       2.91
+commit          3712    46.3241       0.80
+other              0   506.7557       8.76
+```
+
+
+
 
 
 ###### 202102
@@ -2592,6 +2611,23 @@ pt-archiver \
 ```
 
 
+
+```bash
+2025-11-27T15:50:31    4483 13920000
+2025-11-27T15:50:38    4489 13940000
+2025-11-27T15:50:42    4494 13954687
+Started at 2025-11-27T14:35:48, ended at 2025-11-27T15:50:42
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_trend_202102,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.255,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 13954687
+INSERT 13954687
+DELETE 0
+Action         Count       Time        Pct
+inserting   13954687  3948.3831      87.86
+select          1397   131.9698       2.94
+commit          2794    32.8121       0.73
+other              0   380.9343       8.48
+```
 
 
 
@@ -2700,6 +2736,50 @@ pt-archiver \
   --charset utf8 \
   --statistics
 ```
+
+
+
+
+
+###### 202107
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202107
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+```bash
+pt-archiver \
+  --source h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202107,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.255,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2021-07-01' AND trade_date < '2021-08-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+###### 202108
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202108
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+
+
+
+
+
 
 
 
