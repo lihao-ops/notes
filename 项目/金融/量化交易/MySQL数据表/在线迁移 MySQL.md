@@ -1846,7 +1846,7 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-###### 1. 核心机制：一个分区 = 一个文件
+###### 核心机制：一个分区 = 一个文件
 
 
 
@@ -1856,9 +1856,7 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-#### 场景设定
-
-
+> 场景设定
 
 假设你的数据库有 **100 个并发连接**，都在查询这张 1000 个分区的表。
 
@@ -1866,13 +1864,11 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-### 2. 为什么不调优会“崩”？（瓶颈在哪里）
+###### 为什么不调优会“崩”？（瓶颈在哪里）
 
 
 
-
-
-#### 瓶颈一：`open_files_limit` (操作系统的“桌子”太小)
+> 瓶颈一：`open_files_limit` (操作系统的“桌子”太小)
 
 
 
@@ -1886,7 +1882,7 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-#### 瓶颈二：`table_open_cache` (MySQL 的“记性”太差)
+###### 瓶颈二：`table_open_cache` (MySQL 的“记性”太差)
 
 
 
@@ -1902,7 +1898,7 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-### 3. 为什么调优后就“舒适”了？
+###### 3. 为什么调优后就“舒适”了？
 
 
 
@@ -1910,7 +1906,7 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-#### 变化一：物理 I/O 变成了内存指针 (The Magic)
+> 变化一：物理 I/O 变成了内存指针 (The Magic)
 
 
 
@@ -1920,7 +1916,7 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-#### 变化二：并发能力的释放
+> 变化二：并发能力的释放
 
 
 
@@ -1935,7 +1931,7 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-### 4. 既然如此，为什么不建议超过 1000？
+###### 4. 既然如此，为什么不建议超过 1000？
 
 
 
@@ -1955,9 +1951,7 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
-### 总结
-
-
+###### 说明汇总
 
 - **50 ~ 100**：是 **“原生舒适区”**（不用管配置，随便跑都快）。
 - **500 ~ 1000**：是 **“调优舒适区”**（只要内存够、参数配对，完全能驾驭）。
