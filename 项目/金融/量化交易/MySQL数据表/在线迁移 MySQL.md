@@ -4480,7 +4480,29 @@ public String getTargetQuotationTable() {
 
 使用**“黄金指标 (Golden Signals)”** 监控
 
+**分离监控**： 在你的 Java 代码中，使用 **Micrometer (Spring Boot Actuator 自带)** 为新旧两个查询分别打点。
 
+```java
+// 伪代码
+@Timed("mysql.query.kline.old_table")
+public List<Data> queryOldTable() { ... }
+
+@Timed("mysql.query.kline.new_table")
+public List<Data> queryNewTable() { ... }
+```
+
+**建立 Dashboard**： 在 Grafana 中创建一个看板，**并排对比**以下两个指标：
+
+- `mysql_query_kline_old_table_p99` (旧表 P99 延迟)
+- `mysql_query_kline_new_table_p99` (新表 P99 延迟)
+- 以及新表的 `error_rate` (错误率)。
+
+**配置告警 (Alerting)**： 设置一个告警规则：“如果 `mysql_query_kline_new_table_p99` **连续 3 分钟** > 1000ms（1秒），立即告警。”
+
+**执行回滚**：
+
+- **（推荐）手动回滚**：On-Call 工程师收到告警，**手动**去 Nacos 将配置改回 `false`。
+- **（可选）自动熔断**：虽然技术上可行（例如告警 webhook 触发 Jenkins Job 回滚 Nacos），但在迁移初期**不推荐**。手动确认可以防止因网络抖动或压测导致的“自动 flapping”（系统在T0时刻熔断，T1时刻又自动恢复，T2又熔断...）。
 
 
 
