@@ -3797,6 +3797,92 @@ other              0   658.1241       8.81
 
 
 
+
+
+### 维度二：存储与空间 (Storage Efficiency) —— “省不省？”
+
+现在我们要验证**压缩策略**的收益。
+
+这是整个迁移项目中**最容易向上汇报的亮点**，因为它直接关联到 **TCO (Total Cost of Ownership，总拥有成本)**。
+
+
+
+#### 🧮 新旧表空间对比
+
+
+
+##### 1. 查询新表 (Warm 表) 总空间
+
+> 这条 SQL 会加总 `tb_quotation_history_warm` 中所有**有数据**的分区（包括数据和索引）。
+
+```sql
+SELECT 
+    '新表 (tb_quotation_history_warm)' AS table_type,
+    ROUND(SUM(DATA_LENGTH) / 1024 / 1024, 2) AS data_mb,
+    ROUND(SUM(INDEX_LENGTH) / 1024 / 1024, 2) AS index_mb,
+    ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 2) AS total_mb,
+    ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024 / 1024, 2) AS total_gb
+FROM 
+    information_schema.PARTITIONS 
+WHERE 
+    TABLE_SCHEMA = '你的数据库名'  -- ‼️ 记得替换
+    AND TABLE_NAME = 'tb_quotation_history_warm'
+    AND TABLE_ROWS > 0; -- 只统计 2020 和 2021 已迁移的分区
+```
+
+
+
+##### 2. 查询旧表 (Trend 表) 总空间
+
+> 这条 SQL 会自动找到所有 `tb_quotation_history_trend_2020...` 和 `...2021...` 的表并加总。
+
+```sql
+SELECT 
+    '旧表 (tb_quotation_history_trend_...)' AS table_type,
+    ROUND(SUM(DATA_LENGTH) / 1024 / 1024, 2) AS data_mb,
+    ROUND(SUM(INDEX_LENGTH) / 1024 / 1024, 2) AS index_mb,
+    ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 2) AS total_mb,
+    ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024 / 1024, 2) AS total_gb
+FROM 
+    information_schema.TABLES 
+WHERE 
+    TABLE_SCHEMA = '你的数据库名' -- ‼️ 记得替换
+    AND (
+      TABLE_NAME LIKE 'tb_quotation_history_trend_2020%' OR
+      TABLE_NAME LIKE 'tb_quotation_history_trend_2021%'
+    );
+```
+
+------
+
+
+
+##### 📊 如何解读结果
+
+
+
+你会得到两行结果，看起来像这样（我根据你之前的数据估算）：
+
+请执行以下两条 SQL 语句，它们会分别统计新表（2020-2021年数据）和旧表（2020-2021年数据）的总磁盘占用。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### 查询耗时达标
 
 
