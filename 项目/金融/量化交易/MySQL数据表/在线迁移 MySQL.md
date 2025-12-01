@@ -3972,7 +3972,7 @@ WHERE
 
 
 
-###### 实际请求替换数据库名
+###### 实际请求(已替换库名)
 
 ```sql
   SELECT 
@@ -3991,10 +3991,14 @@ WHERE
 
 
 
+###### 返回结果
+
 table_type	data_mb	index_mb	total_mb	total_gb
 新表 (tb_quotation_history_warm)	17304.50	5842.50	23147.00	22.60
 
-
+| table_type                       | data_mb  | index_mb | total_mb | total_gb |
+| -------------------------------- | -------- | -------- | -------- | -------- |
+| 新表 (tb_quotation_history_warm) | 17304.50 | 5842.50  | 23147.00 | 22.60    |
 
 
 
@@ -4024,6 +4028,48 @@ WHERE
 ```
 
 ------
+
+
+
+
+
+###### 实际请求(已替换库名)
+
+```sql
+SELECT 
+    '旧表 (tb_quotation_history_trend_...)' AS table_type,
+    ROUND(SUM(DATA_LENGTH) / 1024 / 1024, 2) AS data_mb,
+    ROUND(SUM(INDEX_LENGTH) / 1024 / 1024, 2) AS index_mb,
+    ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024, 2) AS total_mb,
+    ROUND(SUM(DATA_LENGTH + INDEX_LENGTH) / 1024 / 1024 / 1024, 2) AS total_gb
+FROM 
+    information_schema.TABLES 
+WHERE 
+    TABLE_SCHEMA = 'a_share_quant' -- ‼️ 记得替换
+    AND (
+      TABLE_NAME LIKE 'tb_quotation_history_trend_2020%' OR
+      TABLE_NAME LIKE 'tb_quotation_history_trend_2021%'
+    );
+```
+
+
+
+
+
+###### 返回结果
+
+table_type	data_mb	index_mb	total_mb	total_gb
+旧表 (tb_quotation_history_trend_...)	42884.95	11773.00	54657.95	53.38
+
+
+
+
+
+
+
+
+
+
 
 
 
