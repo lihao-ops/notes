@@ -4391,6 +4391,103 @@ $$
 
 
 
+> “针对业务兼容性，我的方案是**透明化、可观测、可回滚**：
+
+1. **透明化**：新表 schema 与旧表实体类 100% 兼容，无需修改 ORM 映射。我在 Service 层通过 Nacos 配置动态选择表名 (`${tableName}`)，业务代码无感知。
+2. **可观测**：我使用 Micrometer 对新旧两套查询路径进行**分离打点**，在 Grafana 实时监控新表的 P99 延迟和错误率。
+3. **可回滚**：
+   - **兜底预案**：双写机制会保持运行至少一周。
+   - **手动回滚**：一旦监控告警（如 P99 > 1s），On-Call 工程师可在 1 分钟内通过 Nacos 开关将读流量**无损切回**旧表，实现秒级回滚。
+   - **（弃用方案）**：我评估过 `SELECT 1` 的自动熔断方案，但因其无法反映真实查询压力，最终选用了基于核心业务指标（P99/Error Rate）的告警+手动回滚方案，以确保最大稳定性。”
+
+
+
+
+
+
+
+#### “代码兼容”、“Nacos 动态切换”、“自动熔断”
+
+这三点——“代码兼容”、“Nacos 动态切换”、“自动熔断”——正是“稳不稳”这个维度的核心。
+
+
+
+##### ✅ 1. 代码适配性 (已通过)
+
+
+
+> **你的方案**：由于字段保持一致，无需修改实体类，字段类型也是一致。 **评价**：**100% 正确**。这是最理想的状态，你通过 `pt-archiver` 的迁移和新表 DDL 的精心设计，保证了对业务代码的**“透明性”**。
+
+------
+
+
+
+##### ✅ 2. 灰度切换能力 (非常棒)
+
+
+
+> **你的方案**：加一个 `yml` 配置（通过 Nacos 实时发布），读取旧表的 XML 方法直接切换到新表 XML 方法分支即可。 **评价**：**思路完美**。使用 Nacos 这样的配置中心是实现“热切换”的标准实践。
+
+
+
+**推荐方案：动态表名 (Dynamic Table Name)**。
+
+你的 MyBatis Mapper (XML) 根本不需要 `if` 分支，从头到尾**只有一套 SQL**。
+
+
+
+###### 第1步：在 `VerificationQueryParam` (或一个全局 `DBContext`) 中添加一个字段：
+
+```java
+// 这个字段将由 Nacos 配置注入
+@Value("${mysql.migration.read.warm.table:false}")
+private boolean readWarmTable;
+
+public String getTargetQuotationTable() {
+    if (readWarmTable) {
+        return "tb_quotation_history_warm";
+    } else {
+        // 动态计算旧表名, e.g., "tb_quotation_history_trend_202101"
+        return "tb_quotation_history_trend_" + someYearMonthLogic; 
+    }
+}
+```
+
+
+
+###### 第2步：MyBatis XML 这样写：
+
+```xml
+<select id="findKLineData" resultType="com.hao....QuotationDTO">
+    SELECT 
+        latest_price, total_volume, average_price, status
+    FROM 
+        ${param.targetQuotationTable} WHERE 
+        wind_code = #{param.windCode}
+        AND trade_date BETWEEN #{param.startDate} AND #{param.endDate}
+</select>
+```
+
+- **好处**：你的 Java 代码集中控制了路由逻辑，SQL 保持 100% 干净，完全不用改动。
+- **（面试官追问）**：“用 `$` 会有 SQL 注入风险吗？”
+- **（你的回答）**：“在这里没有。因为 `getTargetQuotationTable` 的返回值（表名）是**由我自己的代码在内部生成的**，而不是用户输入的，所以它是 100% 安全的。”
+
+
+
+
+
+##### 第3步：熔断方案
+
+使用**“黄金指标 (Golden Signals)”** 监控
+
+
+
+
+
+
+
+
+
 
 
 
