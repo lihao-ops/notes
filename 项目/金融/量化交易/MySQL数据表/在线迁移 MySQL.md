@@ -3780,6 +3780,14 @@ other              0   827.0603       8.06
 
 
 
+
+
+
+
+
+
+
+
 ##### 查漏补缺
 
 
@@ -3794,8 +3802,8 @@ other              0   827.0603       8.06
 
    ```bash
    pt-archiver \
-     --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202205,u=hli_gho,p=Q836184425 \
-     --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+     --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202205,u=hli_gho,p=Q836184425 \
+     --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
      --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
      --where "trade_date >= '2022-05-01' AND trade_date < '2022-06-01'" \
     --limit 1000 \
@@ -3809,12 +3817,10 @@ other              0   827.0603       8.06
 
 3. **（补11月数据）** 对 11 月执行**同样**的操作：
 
-   
-
    ```bash
    pt-archiver \
-     --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202211,u=hli_gho,p=Q836184425 \
-     --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+     --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202211,u=hli_gho,p=Q836184425 \
+     --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
      --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
      --where "trade_date >= '2022-11-01' AND trade_date < '2022-12-01'" \
     --limit 1000 \
@@ -3947,6 +3953,69 @@ other              0   827.0603       8.06
 > 总结：
 
 你用“浪费”2000 万个毫无业务价值的 BIGINT 数字，换来了数据 0 丢失、服务 0 中断的完美修复。这是一笔非常划算的交易。
+
+
+
+
+
+
+
+
+
+### 迁移tb_quotation_history_trend到热数据表
+
+
+
+##### 2024
+
+
+
+###### 202401
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202401
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202401,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2024-01-01' AND trade_date < '2024-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
