@@ -3392,7 +3392,7 @@ other              0   691.9597       7.77
 
 
 
-###### 202205
+###### 202205(?)
 
 ```sql
 ALTER TABLE tb_quotation_history_trend_202205
@@ -3680,7 +3680,7 @@ other              0   607.5188       7.46
 
 
 
-###### 202211
+###### 202211(?)
 
 ```sql
 ALTER TABLE tb_quotation_history_trend_202211
@@ -3780,7 +3780,51 @@ other              0   827.0603       8.06
 
 
 
+###### 查漏补缺
 
+> 修复SOP
+
+1. **（关键）** 找到并**停止**所有还在往 `tb_quotation_history_trend_2022...` 旧表写入数据的业务或脚本。
+
+2. **（补5月数据）** 运行你之前失败的 `pt-archiver` 命令，**加上 `--replace`**，并调小 `--limit` 以降低在线影响：
+
+   Bash
+
+   ```bash
+   pt-archiver \
+    --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202205,u=hli_gho,p=... \
+    --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=... \
+    --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+    --where "trade_date >= '2022-05-01' AND trade_date < '2022-06-01'" \
+    --limit 1000 \
+    --commit-each \
+    --progress 10000 \
+    --no-delete \
+    --replace \
+    --charset utf8 \
+    --statistics
+   ```
+
+3. **（补11月数据）** 对 11 月执行**同样**的操作：
+
+   Bash
+
+   ```bash
+   pt-archiver \
+    --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202211,u=hli_gho,p=... \
+    --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=... \
+    --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+    --where "trade_date >= '2022-11-01' AND trade_date < '2022-12-01'" \
+    --limit 1000 \
+    --commit-each \
+    --progress 10000 \
+    --no-delete \
+    --replace \
+    --charset utf8 \
+    --statistics
+   ```
+
+4. **（最终校验）** 修复完成后，**再次运行**你的 Java 并发校验程序 `VerificationController`，这次 12 个月份应该都会显示 `错误:0`。
 
 
 
