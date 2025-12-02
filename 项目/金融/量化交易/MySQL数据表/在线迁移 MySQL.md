@@ -3149,6 +3149,349 @@ pt-archiver \
 
 
 
+###### 202202
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202202
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202202,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-02-01' AND trade_date < '2022-03-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+
+
+###### 202203
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202203
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202203,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-03-01' AND trade_date < '2022-04-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+
+
+###### 202204
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202204
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202204,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-04-01' AND trade_date < '2022-05-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+###### 202205
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202201
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202201,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-01-01' AND trade_date < '2022-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+###### 202206
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202201
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202201,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-01-01' AND trade_date < '2022-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+###### 202207
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202201
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202201,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-01-01' AND trade_date < '2022-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+
+
+###### 202208
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202201
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202201,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-01-01' AND trade_date < '2022-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+
+
+###### 202209
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202201
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202201,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-01-01' AND trade_date < '2022-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+###### 202210
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202201
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202201,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-01-01' AND trade_date < '2022-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+
+
+###### 202211
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202201
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202201,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-01-01' AND trade_date < '2022-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+
+
+
+
+###### 202212
+
+```sql
+ALTER TABLE tb_quotation_history_trend_202201
+ADD COLUMN id BIGINT UNSIGNED NULL;
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202201,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-01-01' AND trade_date < '2022-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
