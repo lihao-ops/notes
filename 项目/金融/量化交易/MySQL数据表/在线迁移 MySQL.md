@@ -1466,6 +1466,86 @@ CREATE TABLE `tb_quotation_history_warm` (
 
 
 
+#### 新数据表tb_quotation_history_hot
+
+>tb_quotation_history_hot
+
+```sql
+-- ================================================================================
+-- 1. 热数据表（2024年1月 - 2025年12月，未压缩，快速查询）
+-- ================================================================================
+
+USE `a_share_quant`;
+
+DROP TABLE IF EXISTS tb_quotation_history_hot;
+
+CREATE TABLE tb_quotation_history_hot (
+    id BIGINT UNSIGNED AUTO_INCREMENT COMMENT '自增主键ID',
+    wind_code VARCHAR(20) NOT NULL COMMENT '股票代码（如：000001.SZ）',
+    trade_date DATETIME NOT NULL COMMENT '交易时间（秒级精度）',
+    latest_price DECIMAL(10,4) DEFAULT NULL COMMENT '最新价格',
+    total_volume decimal(50,5) DEFAULT NULL COMMENT '总成交量',
+    average_price DECIMAL(10,4) DEFAULT NULL COMMENT '均价',
+    STATUS TINYINT NOT NULL DEFAULT 1 COMMENT '数据状态：0=无效, 1=有效',
+    create_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP COMMENT '记录创建时间',
+    update_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '记录更新时间',
+
+    -- id在主键前,分区键在后,保证写入性能
+    PRIMARY KEY (id, trade_date),
+
+    -- 同一股票同一秒唯一
+    UNIQUE KEY uniq_windcode_tradedate (wind_code, trade_date)
+
+) ENGINE=INNODB
+  DEFAULT CHARSET=utf8mb4
+  COMMENT='热数据表：保留近2年行情数据，未压缩';
+
+-- === 分区定义（2024-01 ~ 2025-12，共 24 个月）===
+
+ALTER TABLE tb_quotation_history_hot
+PARTITION BY RANGE COLUMNS(trade_date) (
+    PARTITION p202401 VALUES LESS THAN ('2024-02-01'),
+    PARTITION p202402 VALUES LESS THAN ('2024-03-01'),
+    PARTITION p202403 VALUES LESS THAN ('2024-04-01'),
+    PARTITION p202404 VALUES LESS THAN ('2024-05-01'),
+    PARTITION p202405 VALUES LESS THAN ('2024-06-01'),
+    PARTITION p202406 VALUES LESS THAN ('2024-07-01'),
+    PARTITION p202407 VALUES LESS THAN ('2024-08-01'),
+    PARTITION p202408 VALUES LESS THAN ('2024-09-01'),
+    PARTITION p202409 VALUES LESS THAN ('2024-10-01'),
+    PARTITION p202410 VALUES LESS THAN ('2024-11-01'),
+    PARTITION p202411 VALUES LESS THAN ('2024-12-01'),
+    PARTITION p202412 VALUES LESS THAN ('2025-01-01'),
+    
+    PARTITION p202501 VALUES LESS THAN ('2025-02-01'),
+    PARTITION p202502 VALUES LESS THAN ('2025-03-01'),
+    PARTITION p202503 VALUES LESS THAN ('2025-04-01'),
+    PARTITION p202504 VALUES LESS THAN ('2025-05-01'),
+    PARTITION p202505 VALUES LESS THAN ('2025-06-01'),
+    PARTITION p202506 VALUES LESS THAN ('2025-07-01'),
+    PARTITION p202507 VALUES LESS THAN ('2025-08-01'),
+    PARTITION p202508 VALUES LESS THAN ('2025-09-01'),
+    PARTITION p202509 VALUES LESS THAN ('2025-10-01'),
+    PARTITION p202510 VALUES LESS THAN ('2025-11-01'),
+    PARTITION p202511 VALUES LESS THAN ('2025-12-01'),
+    PARTITION p202512 VALUES LESS THAN ('2026-01-01'),
+
+    PARTITION p_future VALUES LESS THAN (MAXVALUE)
+);
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### 面试问答
 
 
