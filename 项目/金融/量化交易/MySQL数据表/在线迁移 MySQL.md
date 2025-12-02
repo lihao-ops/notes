@@ -1824,6 +1824,47 @@ PARTITION BY RANGE COLUMNS(trade_date) (
 
 
 
+
+
+### 相关命令
+
+
+
+#### 快速清空
+
+
+
+
+
+
+
+#### 快速查询分区表各分区总数
+
+```sql
+#1.MySQL 内部的统计数据（TABLE_ROWS）更新
+ANALYZE TABLE tb_quotation_history_warm;
+
+#2.快速查询各分区数据数量(前提是执行统计数据（TABLE_ROWS）更新--才准确)
+SELECT 
+    PARTITION_NAME, 
+    TABLE_ROWS 
+FROM 
+    information_schema.PARTITIONS 
+WHERE 
+    TABLE_SCHEMA = 'a_share_quant' 
+    AND TABLE_NAME = 'tb_quotation_history_warm'
+ORDER BY 
+    PARTITION_ORDINAL_POSITION;
+```
+
+
+
+
+
+
+
+
+
 ### 迁移tb_quotation_history_trend到温数据表
 
 
