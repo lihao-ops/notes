@@ -4085,7 +4085,7 @@ pt-archiver \
 ###### 202405
 
 ```sql
-ALTER TABLE tb_quotation_history_trend_202401
+ALTER TABLE tb_quotation_history_trend_202405
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
 
@@ -4093,10 +4093,10 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 ```bash
 pt-archiver \
-  --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202401,u=hli_gho,p=Q836184425 \
+  --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202405,u=hli_gho,p=Q836184425 \
   --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-  --where "trade_date >= '2024-01-01' AND trade_date < '2024-02-01'" \
+  --where "trade_date >= '2024-05-01' AND trade_date < '2024-06-01'" \
   --limit 10000 \
   --commit-each \
   --progress 20000 \
@@ -5856,6 +5856,40 @@ public List<Data> queryNewTable() { ... }
 
 
 
+
+## 最终删除旧表
+
+
+
+```sql
+-- 2020 --
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202001`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202002`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202003`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202004`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202005`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202006`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202007`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202008`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202009`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202010`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202011`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202012`;
+
+-- 2021 --
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202101`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202102`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202103`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202104`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202105`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202106`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202107`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202108`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202109`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202110`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202111`;
+DROP TABLE IF EXISTS `tb_quotation_history_trend_202112`;
+```
 
 
 
