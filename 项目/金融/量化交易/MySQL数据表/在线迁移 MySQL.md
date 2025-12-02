@@ -3792,10 +3792,10 @@ other              0   827.0603       8.06
 
    ```bash
    pt-archiver \
-    --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202205,u=hli_gho,p=... \
-    --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=... \
-    --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-    --where "trade_date >= '2022-05-01' AND trade_date < '2022-06-01'" \
+     --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202205,u=hli_gho,p=Q836184425 \
+     --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+     --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+     --where "trade_date >= '2022-05-01' AND trade_date < '2022-06-01'" \
     --limit 1000 \
     --commit-each \
     --progress 10000 \
@@ -3807,14 +3807,14 @@ other              0   827.0603       8.06
 
 3. **（补11月数据）** 对 11 月执行**同样**的操作：
 
-   Bash
+   
 
    ```bash
    pt-archiver \
-    --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202211,u=hli_gho,p=... \
-    --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=... \
-    --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-    --where "trade_date >= '2022-11-01' AND trade_date < '2022-12-01'" \
+     --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202211,u=hli_gho,p=Q836184425 \
+     --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+     --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+     --where "trade_date >= '2022-11-01' AND trade_date < '2022-12-01'" \
     --limit 1000 \
     --commit-each \
     --progress 10000 \
