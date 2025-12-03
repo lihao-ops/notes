@@ -5552,7 +5552,7 @@ pt-archiver \
 
 
 
-###### 202512
+###### 202512(未开始)
 
 ```sql
 ALTER TABLE tb_quotation_history_trend_202512
