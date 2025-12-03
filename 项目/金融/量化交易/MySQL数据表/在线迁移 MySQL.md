@@ -3539,6 +3539,19 @@ other              0   658.9705       7.57
 
 
 
+```bash
+-- 确保只清空数据，保留分区结构以便重新回填
+ALTER TABLE tb_quotation_history_warm1 TRUNCATE PARTITION p202205;
+```
+
+
+
+
+
+
+
+
+
 ###### 202206
 
 ```sql
