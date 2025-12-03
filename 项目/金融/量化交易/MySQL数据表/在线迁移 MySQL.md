@@ -4964,6 +4964,29 @@ pt-archiver \
 
 
 
+```bash
+2025-12-03T03:06:25   12049 27980000
+2025-12-03T03:06:32   12055 28000000
+2025-12-03T03:06:32   12055 28000023
+Started at 2025-12-02T23:45:36, ended at 2025-12-03T03:06:32
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202412,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 28000023
+INSERT 28000023
+DELETE 0
+Action         Count       Time        Pct
+inserting   28000023 10585.0870      87.80
+select          2802   366.8869       3.04
+commit          5604   193.0035       1.60
+other              0   911.6044       7.56
+```
+
+
+
+
+
+
+
 
 
 ---
