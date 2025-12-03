@@ -4238,24 +4238,64 @@ pt-archiver \
     --statistics
    ```
 
-3. **（补11月数据）** 对 11 月执行**同样**的操作：
+```bash
+2025-12-03T03:21:39   13134 20350000
+2025-12-03T03:21:43   13137 20360000
+2025-12-03T03:21:45   13140 20366974
+Started at 2025-12-02T23:42:45, ended at 2025-12-03T03:21:45
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202205,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 20366974
+INSERT 40733948
+DELETE 0
+Action         Count       Time        Pct
+inserting   20366974 11654.4999      88.69
+commit         40736   573.7209       4.37
+select         20368   238.8494       1.82
+other              0   673.0334       5.12
+```
 
-   ```bash
-   pt-archiver \
-     --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202211,u=hli_gho,p=Q836184425 \
-     --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
-     --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-     --where "trade_date >= '2022-11-01' AND trade_date < '2022-12-01'" \
-    --limit 1000 \
-    --commit-each \
-    --progress 10000 \
-    --no-delete \
-    --replace \
-    --charset utf8 \
-    --statistics
-   ```
 
-4. **（最终校验）** 修复完成后，**再次运行**你的 Java 并发校验程序 `VerificationController`，这次 12 个月份应该都会显示 `错误:0`。
+
+
+
+
+
+**（补11月数据）** 对 11 月执行**同样**的操作：
+
+```bash
+pt-archiver \
+  --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202211,u=hli_gho,p=Q836184425 \
+  --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2022-11-01' AND trade_date < '2022-12-01'" \
+ --limit 1000 \
+ --commit-each \
+ --progress 10000 \
+ --no-delete \
+ --replace \
+ --charset utf8 \
+ --statistics
+```
+
+1. **（最终校验）** 修复完成后，**再次运行**你的 Java 并发校验程序 `VerificationController`，这次 12 个月份应该都会显示 `错误:0`。
+
+```bash
+2025-12-03T03:47:00   14642 24920000
+2025-12-03T03:47:02   14644 24930000
+2025-12-03T03:47:04   14646 24937031
+Started at 2025-12-02T23:42:57, ended at 2025-12-03T03:47:04
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202211,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 24937031
+INSERT 49874062
+DELETE 0
+Action         Count       Time        Pct
+inserting   24937031 13016.8709      88.87
+commit         49878   604.2517       4.13
+select         24939   263.7010       1.80
+other              0   761.8943       5.20
+```
 
 
 
@@ -4418,6 +4458,25 @@ pt-archiver \
 
 
 
+```bash
+2025-12-03T03:03:47   12029 27320000
+2025-12-03T03:03:53   12035 27340000
+2025-12-03T03:03:55   12037 27348568
+Started at 2025-12-02T23:43:18, ended at 2025-12-03T03:03:55
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202401,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 27348568
+INSERT 27348568
+DELETE 0
+Action         Count       Time        Pct
+inserting   27348568 10565.1308      87.77
+select          2736   372.2527       3.09
+commit          5472   190.7701       1.58
+other              0   909.5998       7.56
+```
+
+
+
 
 
 ###### 202402
@@ -4441,6 +4500,25 @@ pt-archiver \
   --no-delete \
   --charset utf8 \
   --statistics
+```
+
+
+
+```bash
+2025-12-03T02:04:25    8456 18740000
+2025-12-03T02:04:33    8464 18760000
+2025-12-03T02:04:38    8469 18770163
+Started at 2025-12-02T23:43:28, ended at 2025-12-03T02:04:38
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202402,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 18770163
+INSERT 18770163
+DELETE 0
+Action         Count       Time        Pct
+inserting   18770163  7419.4544      87.61
+select          1879   262.8748       3.10
+commit          3758   145.6964       1.72
+other              0   641.0580       7.57
 ```
 
 
@@ -4474,6 +4552,23 @@ pt-archiver \
 
 
 
+```bash
+2025-12-03T02:54:52   11470 26000000
+2025-12-03T02:54:58   11476 26020000
+2025-12-03T02:55:00   11478 26026094
+Started at 2025-12-02T23:43:42, ended at 2025-12-03T02:55:00
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202403,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 26026094
+INSERT 26026094
+DELETE 0
+Action         Count       Time        Pct
+inserting   26026094 10083.9787      87.85
+select          2604   352.7438       3.07
+commit          5208   180.5445       1.57
+other              0   861.2087       7.50
+```
+
 
 
 
@@ -4503,6 +4598,25 @@ pt-archiver \
 
 
 
+```bash
+2025-12-03T02:48:06   11054 24600000
+2025-12-03T02:48:13   11061 24620000
+2025-12-03T02:48:19   11067 24637984
+Started at 2025-12-02T23:43:51, ended at 2025-12-03T02:48:19
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202404,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 24637984
+INSERT 24637984
+DELETE 0
+Action         Count       Time        Pct
+inserting   24637984  9653.7134      87.22
+select          2465   339.8219       3.07
+commit          4930   175.8677       1.59
+other              0   898.4480       8.12
+```
+
+
+
 
 
 ###### 202405
@@ -4526,6 +4640,23 @@ pt-archiver \
   --no-delete \
   --charset utf8 \
   --statistics
+```
+
+```bash
+2025-12-03T02:46:11   10929 24440000
+2025-12-03T02:46:18   10936 24460000
+2025-12-03T02:46:24   10942 24475472
+Started at 2025-12-02T23:44:02, ended at 2025-12-03T02:46:24
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202405,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 24475472
+INSERT 24475472
+DELETE 0
+Action         Count       Time        Pct
+inserting   24475472  9613.8336      87.86
+select          2449   339.1531       3.10
+commit          4898   180.6805       1.65
+other              0   809.1599       7.39
 ```
 
 
