@@ -3549,6 +3549,23 @@ SELECT COUNT(1) AS row_count
 FROM tb_quotation_history_warm PARTITION (p202205);
 ```
 
+```bash
+2025-12-03T16:48:53    7881 20340000
+2025-12-03T16:49:03    7891 20360000
+2025-12-03T16:49:07    7895 20366974
+Started at 2025-12-03T14:37:31, ended at 2025-12-03T16:49:07
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_trend_202205,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 20366974
+INSERT 20366974
+DELETE 0
+Action         Count       Time        Pct
+inserting   20366974  7043.0657      89.21
+select          2038   169.5846       2.15
+commit          4076    65.4867       0.83
+other              0   617.0421       7.82
+```
+
 
 
 
@@ -3853,6 +3870,25 @@ ALTER TABLE tb_quotation_history_warm TRUNCATE PARTITION p202211;
 ```sql
 SELECT COUNT(1) AS row_count
 FROM tb_quotation_history_warm PARTITION (p202211);
+```
+
+
+
+```bash
+2025-12-03T17:27:27   10185 24900000
+2025-12-03T17:27:43   10201 24920000
+2025-12-03T17:28:11   10228 24937031
+Started at 2025-12-03T14:37:42, ended at 2025-12-03T17:28:11
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_trend_202211,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_warm,u=hli_gho
+SELECT 24937031
+INSERT 24937031
+DELETE 0
+Action         Count       Time        Pct
+inserting   24937031  9114.6480      89.11
+select          2495   241.7970       2.36
+commit          4990    91.2857       0.89
+other              0   781.1823       7.64
 ```
 
 
