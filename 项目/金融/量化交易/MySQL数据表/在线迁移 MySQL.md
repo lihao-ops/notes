@@ -5462,6 +5462,25 @@ pt-archiver \
 
 
 
+```bash
+2025-12-03T18:57:25   11648 24240000
+2025-12-03T18:57:31   11654 24260000
+2025-12-03T18:57:37   11660 24271723
+Started at 2025-12-03T15:43:16, ended at 2025-12-03T18:57:37
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_trend_202505,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 24271723
+INSERT 24271723
+DELETE 0
+Action         Count       Time        Pct
+inserting   24271723 10247.9564      87.88
+select          2429   353.6671       3.03
+commit          4858   129.3618       1.11
+other              0   929.9559       7.97
+```
+
+
+
 
 
 ###### 202506
@@ -5639,6 +5658,25 @@ pt-archiver \
   --no-delete \
   --charset utf8 \
   --statistics
+```
+
+
+
+```bash
+2025-12-03T18:58:38   11614 24420000
+2025-12-03T18:58:46   11622 24440000
+2025-12-03T18:58:49   11625 24451024
+Started at 2025-12-03T15:45:03, ended at 2025-12-03T18:58:49
+Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_trend_202511,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 24451024
+INSERT 24451024
+DELETE 0
+Action         Count       Time        Pct
+inserting   24451024 10262.7357      88.27
+select          2447   345.8028       2.97
+commit          4894   128.8162       1.11
+other              0   888.5881       7.64
 ```
 
 
