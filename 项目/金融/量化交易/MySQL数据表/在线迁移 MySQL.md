@@ -5255,10 +5255,10 @@ other              0   911.6044       7.56
 
 
 
-###### 202401
+###### 202501
 
 ```sql
-ALTER TABLE tb_quotation_history_trend_202401
+ALTER TABLE tb_quotation_history_trend_202501
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
 
@@ -5266,10 +5266,10 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 ```bash
 pt-archiver \
-  --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202401,u=hli_gho,p=Q836184425 \
-  --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202501,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-  --where "trade_date >= '2024-01-01' AND trade_date < '2024-02-01'" \
+  --where "trade_date >= '2025-01-01' AND trade_date < '2025-02-01'" \
   --limit 10000 \
   --commit-each \
   --progress 20000 \
@@ -5282,10 +5282,10 @@ pt-archiver \
 
 
 
-###### 202401
+###### 202502
 
 ```sql
-ALTER TABLE tb_quotation_history_trend_202401
+ALTER TABLE tb_quotation_history_trend_202502
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
 
@@ -5293,10 +5293,10 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 ```bash
 pt-archiver \
-  --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202401,u=hli_gho,p=Q836184425 \
-  --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202502,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-  --where "trade_date >= '2024-01-01' AND trade_date < '2024-02-01'" \
+  --where "trade_date >= '2025-02-01' AND trade_date < '2025-03-01'" \
   --limit 10000 \
   --commit-each \
   --progress 20000 \
@@ -5309,10 +5309,10 @@ pt-archiver \
 
 
 
-###### 202401
+###### 202503
 
 ```sql
-ALTER TABLE tb_quotation_history_trend_202401
+ALTER TABLE tb_quotation_history_trend_202503
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
 
@@ -5320,10 +5320,10 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 ```bash
 pt-archiver \
-  --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202401,u=hli_gho,p=Q836184425 \
-  --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202503,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-  --where "trade_date >= '2024-01-01' AND trade_date < '2024-02-01'" \
+  --where "trade_date >= '2025-03-01' AND trade_date < '2025-04-01'" \
   --limit 10000 \
   --commit-each \
   --progress 20000 \
@@ -5336,10 +5336,10 @@ pt-archiver \
 
 
 
-###### 202401
+###### 202504
 
 ```sql
-ALTER TABLE tb_quotation_history_trend_202401
+ALTER TABLE tb_quotation_history_trend_202504
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
 
@@ -5347,10 +5347,10 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 ```bash
 pt-archiver \
-  --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202401,u=hli_gho,p=Q836184425 \
-  --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202504,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-  --where "trade_date >= '2024-01-01' AND trade_date < '2024-02-01'" \
+  --where "trade_date >= '2025-04-01' AND trade_date < '2025-05-01'" \
   --limit 10000 \
   --commit-each \
   --progress 20000 \
@@ -5363,10 +5363,10 @@ pt-archiver \
 
 
 
-###### 202401
+###### 202505
 
 ```sql
-ALTER TABLE tb_quotation_history_trend_202401
+ALTER TABLE tb_quotation_history_trend_202505
 ADD COLUMN id BIGINT UNSIGNED NULL;
 ```
 
@@ -5374,10 +5374,10 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 ```bash
 pt-archiver \
-  --source h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202401,u=hli_gho,p=Q836184425 \
-  --dest   h=192.168.0.106,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202505,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-  --where "trade_date >= '2024-01-01' AND trade_date < '2024-02-01'" \
+  --where "trade_date >= '2025-05-01' AND trade_date < '2025-06-01'" \
   --limit 10000 \
   --commit-each \
   --progress 20000 \
