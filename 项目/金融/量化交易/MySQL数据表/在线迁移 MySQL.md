@@ -3504,8 +3504,8 @@ ADD COLUMN id BIGINT UNSIGNED NULL;
 
 ```bash
 pt-archiver \
-  --source h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202205,u=hli_gho,p=Q836184425 \
-  --dest   h=10.100.224.248,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
+  --source h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202205,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.54,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "trade_date >= '2022-05-01' AND trade_date < '2022-06-01'" \
   --limit 10000 \
@@ -3539,9 +3539,14 @@ other              0   658.9705       7.57
 
 
 
-```bash
+```sql
 -- 确保只清空数据，保留分区结构以便重新回填
-ALTER TABLE tb_quotation_history_warm1 TRUNCATE PARTITION p202205;
+ALTER TABLE tb_quotation_history_warm TRUNCATE PARTITION p202205;
+```
+
+```sql
+SELECT COUNT(1) AS row_count
+FROM tb_quotation_history_warm PARTITION (p202205);
 ```
 
 
