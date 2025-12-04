@@ -7537,25 +7537,112 @@ graph TD
 
 - **老表 SQL** (应用层噩梦):
 
+- 模拟应用层拼接，不得不显式查询三张分表并合并。
+
   ```sql
-  SELECT * FROM tb_quotation_history_trend_202401 WHERE wind_code = '000002.SZ' AND trade_date >= '2024-01-20'
-  UNION ALL
-  SELECT * FROM tb_quotation_history_trend_202402 WHERE wind_code = '000002.SZ'
-  UNION ALL
-  SELECT * FROM tb_quotation_history_trend_202403 WHERE wind_code = '000002.SZ' AND trade_date <= '2024-03-05';
+  SELECT * FROM tb_quotation_history_trend_202401 
+  WHERE wind_code = '600519.SH' AND trade_date BETWEEN '2024-01-20' AND '2024-03-05' 
+  UNION ALL 
+  SELECT * FROM tb_quotation_history_trend_202402 
+  WHERE wind_code = '600519.SH' AND trade_date BETWEEN '2024-01-20' AND '2024-03-05' 
+  UNION ALL 
+  SELECT * FROM tb_quotation_history_trend_202403 
+  WHERE wind_code = '600519.SH' AND trade_date BETWEEN '2024-01-20' AND '2024-03-05';
   ```
 
 - **新表 SQL** (极致优雅):
 
+- 极其简洁，完全由 MySQL 自动处理分区路由。
+
   ```sql
   SELECT * FROM tb_quotation_history_hot 
-  WHERE wind_code = '000002.SZ' 
+  WHERE wind_code = '600519.SH' 
   AND trade_date BETWEEN '2024-01-20' AND '2024-03-05';
   ```
 
 - **关注点**：新表不仅代码简洁，执行效率通常也更高，因为 MySQL 内部处理分区扫描比执行 `UNION ALL` 子查询更优化。
 
 
+
+
+
+###### explain分析
+
+
+
+>
+
+```json
+{
+  "query_block": {
+    "select_id": 1,
+    "cost_info": {
+      "query_cost": "7193.81"
+    },
+    "table": {
+      "table_name": "tb_quotation_history_hot",
+      "partitions": [
+        "p202401",
+        "p202402",
+        "p202403"
+      ],
+      "access_type": "range",
+      "possible_keys": [
+        "uniq_windcode_tradedate"
+      ],
+      "key": "uniq_windcode_tradedate",
+      "used_key_parts": [
+        "wind_code",
+        "trade_date"
+      ],
+      "key_length": "87",
+      "rows_examined_per_scan": 5994,
+      "rows_produced_per_join": 5994,
+      "filtered": "100.00",
+      "index_condition": "((`a_share_quant`.`tb_quotation_history_hot`.`wind_code` = '600519.SH') and (`a_share_quant`.`tb_quotation_history_hot`.`trade_date` between '2024-01-20' and '2024-03-05'))",
+      "cost_info": {
+        "read_cost": "6594.41",
+        "eval_cost": "599.40",
+        "prefix_cost": "7193.81",
+        "data_read_per_join": "842K"
+      },
+      "used_columns": [
+        "id",
+        "wind_code",
+        "trade_date",
+        "latest_price",
+        "total_volume",
+        "average_price",
+        "STATUS",
+        "create_time",
+        "update_time"
+      ]
+    }
+  }
+}
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+###### 测试用例
+
+```
+QuotationBenchmarkTest.java
+```
+
+
+
+###### 测验报告
 
 ```java
 =======================================================
@@ -7584,6 +7671,38 @@ graph TD
 🌟 评价: 分区表架构不仅简化了代码，还带来了显著的性能优势！
 =======================================================
 ```
+
+> 1. 🚀 核心结论：新架构完胜
+
+- **性能不降反升**：我们在做架构重构时，最担心的是引入分层或路由机制导致性能回退。但你的测试表明，新表在**自动处理分区路由**的情况下，依然比老表手动拼 SQL 快了近 **1ms**。
+- **响应极速**：**11ms** 返回 **6000 条**数据，这是一个非常优秀的指标。这说明你的 **B+树索引** 和 **分区裁剪** 配合得天衣无缝，MySQL 几乎是在瞬间就定位到了这 3 个分区文件里的目标数据块。
+
+> 2. 💡 为什么差距只有 0.8ms？（揭秘）
+
+你可能会想：“费了这么大劲，怎么才快了不到 1 毫秒？” 其实，在 **10ms 级别** 的超高速查询中，数据库内部的扫描耗时占比已经很小了，大头往往在：
+
+1. **网络传输 (Network)**：传输 6000 行数据的时间。
+2. **对象封装 (ResultSet Mapping)**：JdbcTemplate 将 MySQL 二进制流转成 Java 对象的时间。
+3. **SQL 解析**：解析 SQL 语句的时间。
+
+**老表 (UNION ALL)** 的劣势在于 MySQL 需要构建临时表来合并结果，以及解析更复杂的 SQL 语句。 **新表 (Partition)** 省去了临时表合并的开销，直接流式返回数据，所以它不仅代码简单，执行路径也更短。
+
+> 3. 🌟 真正的价值：代码维度的降维打击
+
+请对比一下为了这 12ms 响应，你的 Java 代码付出了什么：
+
+- **老架构 (Old)**：
+  - 代码里充满了 `DateUtil.getMonthsBetween()`, `String.format("tb_%s", month)` 等复杂的表名计算逻辑。
+  - 还要手动拼接 `UNION ALL` 字符串，极其容易出错且难以维护。
+- **新架构 (New)**：
+  - **一行代码**：`trade_date BETWEEN ? AND ?`。
+  - **零维护**：以后哪怕要查跨 5 年的数据，代码**一个字都不用改**，MySQL 自己去翻那 60 个分区文件。
+
+
+
+
+
+
 
 
 
