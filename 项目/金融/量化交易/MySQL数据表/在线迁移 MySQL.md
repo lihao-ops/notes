@@ -7362,23 +7362,27 @@ graph TD
     "query_block": {
       "select_id": 1,
       "cost_info": {
+        // 老表的查询成本较低(49.44)，因为直接走了主键聚簇索引，不需要回表
         "query_cost": "49.44"
       },
       "ordering_operation": {
         "using_filesort": false,
         "table": {
+          // 确认查询目标是物理分表 202401
           "table_name": "tb_quotation_history_trend_202401",
           "access_type": "range",
           "possible_keys": [
             "PRIMARY",
             "idx_wind_code"
           ],
+          // 使用了 PRIMARY 主键（聚簇索引），数据和索引在一起，效率极高
           "key": "PRIMARY",
           "used_key_parts": [
             "wind_code",
             "trade_date"
           ],
           "key_length": "87",
+          // 扫描行数 239 行，精准定位到这一天的数据
           "rows_examined_per_scan": 239,
           "rows_produced_per_join": 239,
           "filtered": "100.00",
@@ -7411,12 +7415,15 @@ graph TD
     "query_block": {
       "select_id": 1,
       "cost_info": {
+        // 新表成本(287.81)看起来比老表高，是因为走了二级索引需要“回表”，但在毫秒级查询中这点差异可忽略
         "query_cost": "287.81"
       },
       "ordering_operation": {
         "using_filesort": false,
         "table": {
+          // 确认查询目标是新分区大表
           "table_name": "tb_quotation_history_hot",
+          // 【核心验证点】分区裁剪完美生效！MySQL 极其聪明地只扫描了 p202401 这一个分区
           "partitions": [
             "p202401"
           ],
@@ -7424,12 +7431,14 @@ graph TD
           "possible_keys": [
             "uniq_windcode_tradedate"
           ],
+          // 使用了 uniq_windcode_tradedate 二级索引
           "key": "uniq_windcode_tradedate",
           "used_key_parts": [
             "wind_code",
             "trade_date"
           ],
           "key_length": "87",
+          // 【核心验证点】扫描行数也是 239 行，与老表完全一致，说明索引效率没有降低
           "rows_examined_per_scan": 239,
           "rows_produced_per_join": 239,
           "filtered": "100.00",
