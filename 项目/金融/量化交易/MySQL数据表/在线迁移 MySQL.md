@@ -7035,6 +7035,8 @@ public List<Data> queryNewTable() { ... }
 
 
 ```sql
+USE `a_share_quant`;
+
 -- 2020 --
 DROP TABLE IF EXISTS `tb_quotation_history_trend_202001`;
 DROP TABLE IF EXISTS `tb_quotation_history_trend_202002`;
@@ -7062,6 +7064,21 @@ DROP TABLE IF EXISTS `tb_quotation_history_trend_202109`;
 DROP TABLE IF EXISTS `tb_quotation_history_trend_202110`;
 DROP TABLE IF EXISTS `tb_quotation_history_trend_202111`;
 DROP TABLE IF EXISTS `tb_quotation_history_trend_202112`;
+
+
+-- 删除 2022 年剩余的所有旧分表
+DROP TABLE IF EXISTS tb_quotation_history_trend_202201;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202202;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202203;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202204;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202205;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202206;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202207;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202208;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202209;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202210;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202211;
+DROP TABLE IF EXISTS tb_quotation_history_trend_202212;
 ```
 
 
