@@ -7858,6 +7858,68 @@ QuotationBenchmarkTest.java
 
 
 
+
+
+###### explain
+
+```json
+{
+  "query_block": {
+    "select_id": 1,
+    "cost_info": {
+      // 查询成本为 217万。虽然比点查询高，但考虑到这是在几百万行数据中找最大值且没有直接索引，这个开销是合理的。
+      "query_cost": "2177444.24"
+    },
+    "table": {
+      "table_name": "tb_quotation_history_hot",
+      // 【核心验证点：通过】分区裁剪完美生效！MySQL 仅扫描了 2025年11月、12月及未来分区，完全跳过了历史数据。
+      "partitions": [
+        "p202511",
+        "p202512",
+        "p_future"
+      ],
+      "access_type": "range",
+      "possible_keys": [
+        "PRIMARY",
+        "uniq_windcode_tradedate"
+      ],
+      // 使用了联合索引 (wind_code, trade_date)，尽管 wind_code 未在查询条件中
+      "key": "uniq_windcode_tradedate",
+      "used_key_parts": [
+        "wind_code",
+        "trade_date"
+      ],
+      "key_length": "87",
+      // 扫描了约 790 万行索引记录。这是因为需要遍历这几个分区内的所有数据来确定最大日期。
+      "rows_examined_per_scan": 7901267,
+      "rows_produced_per_join": 7901267,
+      "filtered": "100.00",
+      // 【重要优化】触发了 MySQL 8.0+ 的 "Skip Scan" (跳跃扫描)。MySQL 在索引中跳过 wind_code 前缀来查找 trade_date，比全索引扫描更快。
+      "using_index_for_skip_scan": true,
+      "cost_info": {
+        "read_cost": "1387317.54",
+        "eval_cost": "790126.70",
+        "prefix_cost": "2177444.24",
+        "data_read_per_join": "1G"
+      },
+      "used_columns": [
+        "trade_date"
+      ],
+      // 过滤条件：只查找 2025-11-01 之后的数据
+      "attached_condition": "(`a_share_quant`.`tb_quotation_history_hot`.`trade_date` >= TIMESTAMP'2025-11-01 00:00:00')"
+    }
+  }
+}
+```
+
+
+
+
+
+
+
+
+
 #### 🚀 阶段二：覆盖索引 (Covering Index) 专项优化
 
 **背景**：`hot` 表虽然查询快，但如果每次查询都要“回表”（去聚簇索引里捞数据），在高并发下依然会消耗 IO。
