@@ -3875,20 +3875,20 @@ FROM tb_quotation_history_warm PARTITION (p202211);
 
 
 ```bash
-2025-12-03T17:27:27   10185 24900000
-2025-12-03T17:27:43   10201 24920000
-2025-12-03T17:28:11   10228 24937031
-Started at 2025-12-03T14:37:42, ended at 2025-12-03T17:28:11
-Source: A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_trend_202211,u=hli_gho
-Dest:   A=utf8,D=a_share_quant,P=3306,h=10.100.224.54,p=...,t=tb_quotation_history_warm,u=hli_gho
+2025-12-04T02:08:46    6263 24900000
+2025-12-04T02:08:51    6269 24920000
+2025-12-04T02:08:56    6273 24937031
+Started at 2025-12-04T00:24:22, ended at 2025-12-04T02:08:56
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202211,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_warm,u=hli_gho
 SELECT 24937031
 INSERT 24937031
 DELETE 0
 Action         Count       Time        Pct
-inserting   24937031  9114.6480      89.11
-select          2495   241.7970       2.36
-commit          4990    91.2857       0.89
-other              0   781.1823       7.64
+inserting   24937031  5524.2175      88.05
+select          2495   128.0920       2.04
+commit          4990    30.2915       0.48
+other              0   591.1589       9.42
 ```
 
 
@@ -5684,6 +5684,25 @@ pt-archiver \
 
 
 
+```bash
+2025-12-04T02:16:38    6710 28200000
+2025-12-04T02:16:42    6714 28220000
+2025-12-04T02:16:43    6716 28225185
+Started at 2025-12-04T00:24:47, ended at 2025-12-04T02:16:43
+Source: A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_trend_202509,u=hli_gho
+Dest:   A=utf8,D=a_share_quant,P=3306,h=192.168.0.106,p=...,t=tb_quotation_history_hot,u=hli_gho
+SELECT 28225185
+INSERT 28225185
+DELETE 0
+Action         Count       Time        Pct
+inserting   28225185  5924.6723      88.22
+select          2824   138.7507       2.07
+commit          5648    34.3711       0.51
+other              0   618.3331       9.21
+```
+
+
+
 
 
 ###### 202510
@@ -7098,7 +7117,7 @@ DROP TABLE IF EXISTS `tb_quotation_history_trend_202112`;
     512M    binlog.000345
     ...
     Total: 224G
-    ```
+```
   * **DBA 1 (开始困惑):** "Binlog 确实占了 224G... 难道配置没生效？"
     ```bash
     [db_admin@mysql-master-01 ~]$ grep 'expire' /etc/my.cnf
@@ -7184,7 +7203,7 @@ DROP TABLE IF EXISTS `tb_quotation_history_trend_202112`;
 这个v2.0的案例，更真实地反映了有经验的DBA团队也会踩到的“高级陷阱”。
 ```
 
-```text
+​```text
 您问到了最关键的点上！
 
 您完全正确。在v2.0的案例中，DBA设置的“7天自动清理”策略**完全失败了**，它**无法**清理掉您这次迁移数据造成的204GB日志。
@@ -7211,7 +7230,7 @@ DROP TABLE IF EXISTS `tb_quotation_history_trend_202112`;
 2.  **安全清除：** 在主库上执行 `PURGE` 命令，告诉它：“把 `binlog.000339` 之前的所有日志都删掉，这些是安全的。”
     ```sql
     PURGE BINARY LOGS TO 'binlog.000339';
-    ```
+```
 
 <!-- end list -->
 
@@ -7249,7 +7268,7 @@ DROP TABLE IF EXISTS `tb_quotation_history_trend_202112`;
 
 
 
-```bash
+​```bash
 您说对了一半，但我们有一个**更好的消息**！您抓住了线上运维的核心：**不能宕机**。
 
 您的理解是“修改 `my.cnf` 文件 = 需要重启 = 宕机”。这个逻辑是正确的。
@@ -7282,7 +7301,7 @@ SET GLOBAL binlog_space_limit = 100G;
     [mysqld]
     ...
     binlog_space_limit = 100G
-    ```
+```
   * **效果：** **保存这个文件不会有任何事情发生**。它只是静静地躺在那里，直到**几个月后**您因为其他原因（如系统升级、打补丁）**计划内**重启 MySQL 服务时，MySQL 在启动时会读取这个文件，确保 `binlog_space_limit = 100G` 这个策略被**永久**加载。
 
 -----
@@ -7297,3 +7316,5 @@ SET GLOBAL binlog_space_limit = 100G;
 2.  **稍后**再去修改 `my.cnf` 文件，以确保这个配置在**未来**重启后依然生效。
 ```
 
+
+```
