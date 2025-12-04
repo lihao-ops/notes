@@ -7030,7 +7030,7 @@ public List<Data> queryNewTable() { ... }
 
 
 
-## 最终删除旧表
+### 最终删除旧表
 
 
 
@@ -7217,19 +7217,168 @@ graph TD
 
 ### 性能检验
 
-
-
-#### 方案
-
+>hot表追求的是极致的性能，最开始先跟老表来进行性能对比分析
 
 
 
+#### 🚀 阶段一：基准性能 PK（新老表对决）
+
+> **目标**：用数据说话，验证分区表架构在核心场景下的性能表现，确立性能基线。
 
 
 
+##### 准备工作
+
+**环境**：你的本地 Windows 开发机（24核 CPU，资源充足）。
+
+**关键设置**：为了排除 MySQL 查询缓存（Query Cache）或操作系统文件系统缓存的干扰，建议在每次测试前执行 `RESET QUERY CACHE;`（如果 MySQL 版本支持）或者主要关注多次运行的**平均耗时**和 **稳定耗时**。
+
+**工具**：Navicat、DBeaver 或 MySQL 命令行（开启 `set profiling=1;` 查看详细耗时）。
 
 
 
+##### 🧪 测试用例 1：精确点查询 (Point Select)
+
+**场景**：用户查询某只股票（如万科A `000002.SZ`）在某一天（如 `2024-01-15`）的行情。这是最高频的业务场景。
+
+- **老表 SQL** (需应用层拼表名):
+
+  ```sql
+  SELECT * FROM tb_quotation_history_trend_202401 
+  WHERE wind_code = '000002.SZ' AND trade_date = '2024-01-15';
+  ```
+
+- **新表 SQL** (自动路由):
+
+  ```sql
+  SELECT * FROM tb_quotation_history_hot 
+  WHERE wind_code = '000002.SZ' AND trade_date = '2024-01-15';
+  ```
+
+- **关注点**：
+
+  - **耗时**：两者应在毫秒级，差异极小。
+  - **Explain**：新表必须显示 `partitions: p202401`，证明分区裁剪生效。
+
+  
+
+##### 🧪 测试用例 2：跨月范围查询 (Range Select) —— **新表的主场**
+
+**场景**：查询某只股票最近 45 天的走势（例如 `2024-01-20` 到 `2024-03-05`）。
+
+- **老表 SQL** (应用层噩梦):
+
+  ```sql
+  SELECT * FROM tb_quotation_history_trend_202401 WHERE wind_code = '000002.SZ' AND trade_date >= '2024-01-20'
+  UNION ALL
+  SELECT * FROM tb_quotation_history_trend_202402 WHERE wind_code = '000002.SZ'
+  UNION ALL
+  SELECT * FROM tb_quotation_history_trend_202403 WHERE wind_code = '000002.SZ' AND trade_date <= '2024-03-05';
+  ```
+
+- **新表 SQL** (极致优雅):
+
+  ```sql
+  SELECT * FROM tb_quotation_history_hot 
+  WHERE wind_code = '000002.SZ' 
+  AND trade_date BETWEEN '2024-01-20' AND '2024-03-05';
+  ```
+
+- **关注点**：新表不仅代码简洁，执行效率通常也更高，因为 MySQL 内部处理分区扫描比执行 `UNION ALL` 子查询更优化。
+
+
+
+##### 🧪 测试用例 3：最新日期查询 (Aggregation)
+
+**场景**：获取当前库里最新的交易日期。
+
+- **新表 SQL** (我们优化过的版本):
+
+  ```sql
+  SELECT MAX(trade_date) 
+  FROM tb_quotation_history_hot 
+  WHERE trade_date >= '2025-11-01'; -- 给定一个近期的时间下限
+  ```
+
+- **关注点**：验证是否触发分区裁剪，耗时是否在可接受范围（毫秒级）。
+
+------
+
+### 🚀 阶段二：覆盖索引 (Covering Index) 专项优化
+
+**背景**：`hot` 表虽然查询快，但如果每次查询都要“回表”（去聚簇索引里捞数据），在高并发下依然会消耗 IO。
+
+什么是覆盖索引？
+
+如果一个索引包含了查询所需的所有字段，MySQL 就可以直接在索引树上拿到结果，完全不需要回表去读数据文件。这叫“索引覆盖”。
+
+**测试与决策步骤**：
+
+#### 1. 识别高频“只读”列
+
+检查你的业务代码，有没有那种**只查询某几个字段**的高频 SQL？
+
+- 例如：K线图接口可能只需要 `open`, `high`, `low`, `close`, `volume`, `amount`。
+
+#### 2. 设计测试用例：回表 vs 覆盖
+
+假设你的联合索引目前是：`uniq_wind_date (wind_code, trade_date)`。
+
+- **场景 A（回表）**：
+
+  SQL
+
+  ```
+  -- 需要查 latest_price，索引里没有，必须回表
+  SELECT trade_date, latest_price FROM tb_quotation_history_hot 
+  WHERE wind_code = '000002.SZ' AND trade_date >= '2025-01-01';
+  ```
+
+  - `Explain` 结果：`Extra` 字段为空（或者 Using where）。
+
+- 场景 B（模拟覆盖索引）：
+
+  为了测试，你可以临时加一个测试索引，或者只查索引里有的字段来看看速度差异。
+
+  SQL
+
+  ```
+  -- 只查索引里有的字段，不需要回表
+  SELECT trade_date FROM tb_quotation_history_hot 
+  WHERE wind_code = '000002.SZ' AND trade_date >= '2025-01-01';
+  ```
+
+  - `Explain` 结果：`Extra` 字段显示 **`Using index`**。这就是性能的极致境界。
+
+#### 3. 决策建议
+
+如果你的核心高频接口只需要很少的几个字段（例如行情推送只发价格和量），那么建立一个包含这些字段的**复合索引**（例如 `idx_w_t_price_vol (wind_code, trade_date, latest_price, volume)`）可以带来巨大的性能提升。
+
+**但是（Trade-off）**：
+
+- `hot` 表是热数据，每天都要写入。
+- 每多一个索引，`INSERT` 的开销就会增加一分（因为要同时更新数据文件和所有索引树）。
+- **建议**：除非你的**读压力**已经大到数据库 CPU/IO 报警，或者该查询是**超高频核心路径**，否则**不要轻易加宽索引**。保持 `(wind_code, trade_date)` 通常已经是读写平衡的最佳点。
+
+------
+
+### 🚀 阶段三：压力测试（Stress Test）
+
+在单条 SQL 优化到极致后，最后一步是模拟生产环境的并发压力。
+
+1. **工具**：可以使用 `JMeter` 或简单的 Java 多线程程序（复用你的校验程序逻辑，但改为只读查询）。
+2. **目标**：
+   - 在 50、100、200 并发下，观察 `hot` 表的响应时间（P99 Latency）。
+   - 观察数据库 CPU 和 IOPS 的水位。
+3. **对比**：如果在这个压力下，新表的表现优于或等于旧表（且省去了分表逻辑），那么你的重构就是大获全胜。
+
+------
+
+### ✅ 执行建议
+
+现在，你可以先在本地跑 阶段一（基准性能 PK）。
+
+把你觉得最慢、最担心的几条业务 SQL 拿出来，在新表上跑一下 EXPLAIN 和实际耗时，发给我，我们一起看看有没有优化的空间！
 
 
 
