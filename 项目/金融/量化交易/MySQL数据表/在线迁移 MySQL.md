@@ -7370,15 +7370,60 @@ MySQL 8.0 默认开启了**缓冲池状态保存与恢复**功能。
 
 
 
+**在理想情况下，如果行数据大小为 1KB，MySQL InnoDB 的 B+ 树在 3 层高度时，确实可以存储约 2000 万行数据。**
+
+不过，你的推算前提中有一个明显的**参数冲突**需要修正（可能是笔误），否则物理上是不成立的。我们需要把这个参数修正为 MySQL 的默认标准
+
+
+
+```mermaid
+graph TD
+    %% 定义样式
+    classDef rootStyle fill:#ffcccc,stroke:#333,stroke-width:2px;
+    classDef midStyle fill:#cce5ff,stroke:#333,stroke-width:2px;
+    classDef leafStyle fill:#ccffcc,stroke:#333,stroke-width:2px;
+    classDef resStyle fill:#ffffcc,stroke:#ff9900,stroke-width:4px,stroke-dasharray:5 5;
+
+    %% 第一层
+    subgraph Level1 ["第1层: 根节点 Root"]
+        RootNode("根节点<br/>1个页面<br/>1099个指针"):::rootStyle
+    end
+
+    RootNode -- "扇出 1099" --> MidNode1
+    RootNode -- "..." --> MidNode2
+    RootNode -- "扇出 1099" --> MidNode3
+
+    %% 第二层
+    subgraph Level2 ["第2层: 非叶子节点 Internal"]
+        MidNode1("中间页 1"):::midStyle
+        MidNode2("... 共 1099 页 ..."):::midStyle
+        MidNode3("中间页 1099"):::midStyle
+    end
+
+    MidNode1 -- "扇出 1099" --> LeafGroup1
+    MidNode2 -- "..." --> LeafGroup2
+    MidNode3 -- "扇出 1099" --> LeafGroup3
+
+    %% 第三层
+    subgraph Level3 ["第3层: 叶子节点 Leaf"]
+        LeafGroup1("叶子页组 1<br/>约1099页"):::leafStyle
+        LeafGroup2("... 总计约 120万 页 ..."):::leafStyle
+        LeafGroup3("叶子页组 1099<br/>约1099页"):::leafStyle
+    end
+
+    %% 结果节点（错误点已修复：加上了双引号）
+    Result("最终计算:<br/>16行 x 1099 x 1099<br/>约 19,324,816 行"):::resStyle
+
+    LeafGroup1 --- Result
+    LeafGroup2 --- Result
+    LeafGroup3 --- Result
+```
 
 
 
 
-你的结论基本是正确的：**在理想情况下，如果行数据大小为 1KB，MySQL InnoDB 的 B+ 树在 3 层高度时，确实可以存储约 2000 万行数据。**
 
-不过，你的推算前提中有一个明显的**参数冲突**需要修正（可能是笔误），否则物理上是不成立的。我们需要把这个参数修正为 MySQL 的默认标准，你的计算逻辑才能跑通。
 
-以下是详细的推算分析和修正：
 
 ##### 1. 修正前提条件 (Critical Correction)
 
@@ -7451,17 +7496,13 @@ MySQL 8.0 默认开启了**缓冲池状态保存与恢复**功能。
 
   
   $$
-  $$16384 \text{ Bytes (页大小)} \div 14 \text{ Bytes} \approx 1170$$
+  16384 \text{ Bytes (页大小)} \div 14 \text{ Bytes} \approx 1170
   $$
   
 
   
 
   (扣除一些页面的元数据，所以我们之前保守估算为 1099)
-
-
-
-
 
 
 
@@ -7486,6 +7527,7 @@ MySQL 8.0 默认开启了**缓冲池状态保存与恢复**功能。
     * 每个节点又有 1099 个指针，指向叶子节点。
     * 总叶子节点数 = $1099 \times 1099 = 1,207,801$ 个页面。
 3.  **叶子层 (Level 3 - Data):**
+    
     * 每个叶子节点存 16 行数据。
     
     * **总行数公式：**
@@ -7505,6 +7547,8 @@ MySQL 8.0 默认开启了**缓冲池状态保存与恢复**功能。
         * 
 
 **结论：** 16 * 1099 * 1099 约等于 **1932万**行数据
+
+
 
 
 
