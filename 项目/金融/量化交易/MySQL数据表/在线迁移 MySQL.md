@@ -7298,15 +7298,33 @@ graph TD
 - **老表 SQL** (需应用层拼表名):
 
   ```sql
-  SELECT * FROM tb_quotation_history_trend_202401 
-  WHERE wind_code = '600519.SH' AND trade_date = '2024-01-15';
+  SELECT 
+      wind_code,
+      trade_date,
+      latest_price,
+      total_volume,
+      average_price
+  FROM tb_quotation_history_trend_202401
+  WHERE trade_date >= '20240115'
+    AND trade_date <= '20240116'
+    AND wind_code IN ('600519.SH')
+  ORDER BY trade_date ASC;
   ```
 
 - **新表 SQL** (自动路由):
 
   ```sql
-  SELECT * FROM tb_quotation_history_hot 
-  WHERE wind_code = '600519.SH' AND trade_date = '2024-01-15';
+  SELECT 
+      wind_code,
+      trade_date,
+      latest_price,
+      total_volume,
+      average_price
+  FROM tb_quotation_history_hot
+  WHERE trade_date >= '20240115'
+    AND trade_date <= '20240116'
+    AND wind_code IN ('600519.SH')
+  ORDER BY trade_date ASC;
   ```
 
 - **关注点**：
@@ -7334,6 +7352,64 @@ graph TD
   
 
   ###### explain分析
+
+  
+
+  
+
+  
+
+  >hot表
+
+  ```json
+  {
+    "query_block": {
+      "select_id": 1,
+      "cost_info": {
+        "query_cost": "287.81"
+      },
+      "ordering_operation": {
+        "using_filesort": false,
+        "table": {
+          "table_name": "tb_quotation_history_hot",
+          "partitions": [
+            "p202401"
+          ],
+          "access_type": "range",
+          "possible_keys": [
+            "uniq_windcode_tradedate"
+          ],
+          "key": "uniq_windcode_tradedate",
+          "used_key_parts": [
+            "wind_code",
+            "trade_date"
+          ],
+          "key_length": "87",
+          "rows_examined_per_scan": 239,
+          "rows_produced_per_join": 239,
+          "filtered": "100.00",
+          "index_condition": "((`a_share_quant`.`tb_quotation_history_hot`.`wind_code` = '600519.SH') and (`a_share_quant`.`tb_quotation_history_hot`.`trade_date` >= TIMESTAMP'2024-01-15 00:00:00') and (`a_share_quant`.`tb_quotation_history_hot`.`trade_date` <= TIMESTAMP'2024-01-16 00:00:00'))",
+          "cost_info": {
+            "read_cost": "263.91",
+            "eval_cost": "23.90",
+            "prefix_cost": "287.81",
+            "data_read_per_join": "33K"
+          },
+          "used_columns": [
+            "id",
+            "wind_code",
+            "trade_date",
+            "latest_price",
+            "total_volume",
+            "average_price"
+          ]
+        }
+      }
+    }
+  }
+  ```
+
+  
 
   
 
