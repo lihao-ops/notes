@@ -7089,6 +7089,26 @@ DROP TABLE IF EXISTS tb_quotation_history_trend_202212;
 
 
 
+## 优化
+
+
+
+
+
+
+
+
+
+### 问答
+
+
+
+##### 什么情况下会把数据表的索引加载到缓存中呢
+
+
+
+
+
 
 
 ## 遇到的问题
