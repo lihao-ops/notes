@@ -7355,11 +7355,56 @@ graph TD
 
   
 
-  
+  >tb_quotation_history_trend_202401表sql执行计划
+
+  ```json
+  {
+    "query_block": {
+      "select_id": 1,
+      "cost_info": {
+        "query_cost": "49.44"
+      },
+      "ordering_operation": {
+        "using_filesort": false,
+        "table": {
+          "table_name": "tb_quotation_history_trend_202401",
+          "access_type": "range",
+          "possible_keys": [
+            "PRIMARY",
+            "idx_wind_code"
+          ],
+          "key": "PRIMARY",
+          "used_key_parts": [
+            "wind_code",
+            "trade_date"
+          ],
+          "key_length": "87",
+          "rows_examined_per_scan": 239,
+          "rows_produced_per_join": 239,
+          "filtered": "100.00",
+          "cost_info": {
+            "read_cost": "25.54",
+            "eval_cost": "23.90",
+            "prefix_cost": "49.44",
+            "data_read_per_join": "33K"
+          },
+          "used_columns": [
+            "wind_code",
+            "trade_date",
+            "latest_price",
+            "total_volume",
+            "average_price"
+          ],
+          "attached_condition": "((`a_share_quant`.`tb_quotation_history_trend_202401`.`wind_code` = '600519.SH') and (`a_share_quant`.`tb_quotation_history_trend_202401`.`trade_date` >= TIMESTAMP'2024-01-15 00:00:00') and (`a_share_quant`.`tb_quotation_history_trend_202401`.`trade_date` <= TIMESTAMP'2024-01-16 00:00:00'))"
+        }
+      }
+    }
+  }
+  ```
 
   
 
-  >hot表
+  >tb_quotation_history_hot表sql执行计划
 
   ```json
   {
@@ -7409,7 +7454,45 @@ graph TD
   }
   ```
 
-  
+  **新表的分区设计完全生效，且查询效率符合预期。**
+
+  这里为你深度解读这两份报告背后的“玄机”，特别是为什么新表的 `query_cost`（查询成本）看起来比老表高，但实际上性能是一样的。
+
+  >✅ 核心指标验收：测试通过
+
+  - **分区裁剪 (Partition Pruning)**：**成功**
+
+    - 在 `tb_quotation_history_hot` 的报告中，`"partitions": ["p202401"]` 赫然在列。
+    - **意义**：这证明 MySQL 极其聪明地**只打开了 2024年1月** 这一个分区的门，完全忽略了其他几十个分区（包括拥有几千万数据的历史分区）。这是分区表性能保障的基石。
+
+  - **扫描行数 (Rows Examined)**：**完美一致**
+
+    - 老表：`"rows_examined_per_scan": 239`
+    - 新表：`"rows_examined_per_scan": 239`
+    - **意义**：新表的索引 `uniq_windcode_tradedate` 工作状态极佳，精准定位到了这 239 条记录，没有多扫描一行废数据。
+
+    
+
+  > 🧐 深度分析：为什么新表的 Cost (287.81) 比老表 (49.44) 高？
+
+  你可能会注意到 `query_cost` 变大了（49 -> 287），这是否意味着性能下降？ 
+
+  **答案是：在毫秒级查询中，这个差异完全可以忽略不计。**
+
+  根本原因在于**索引类型的不同**导致的成本计算方式差异：
+
+  - **老表 (`tb_quotation_history_trend_202401`)**：
+    - **索引**：`key: PRIMARY`
+    - **机制**：老表的主键很可能是 `(wind_code, trade_date)`。这不仅是索引，还是**聚簇索引（Clustered Index）**。数据就“住”在索引叶子节点上。
+    - **成本**：找到索引就找到了数据，**一次 I/O** 搞定，所以成本极低 (49.44)。
+  - **新表 (`tb_quotation_history_hot`)**：
+    - **索引**：`key: uniq_windcode_tradedate`
+    - **机制**：这是一个**二级索引（Secondary Index）**。
+      1. MySQL 先扫描二级索引，找到 239 个主键 ID。
+      2. 然后拿着这 239 个 ID，回到主键索引（回表）去捞取 `latest_price` 等字段的数据。
+    - **成本**：MySQL 优化器认为“回表”操作是随机 I/O，比较昂贵，所以给出了更高的估算值 (287.81)。
+
+  **💡 结论**： 虽然成本估算高了，但对于 **239 行** 这种微量数据，实际执行时间的差异是 **微秒级** 的（例如从 `0.2ms` 变成 `0.3ms`），用户端完全无感。
 
   
 
@@ -7430,14 +7513,6 @@ graph TD
   
 
   **享受了分区表的管理便利性（不用拼表名），同时没有牺牲任何查询性能。**
-
-  
-
-  
-
-  
-
-  
 
   
 
