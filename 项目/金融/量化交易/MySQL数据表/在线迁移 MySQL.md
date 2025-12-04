@@ -7265,7 +7265,7 @@ graph TD
 
 
 
-既然不能（也不需要）清空查询缓存，建议你采用 **“冷热对比法”** 来进行更客观的测试：
+> 既然不能（也不需要）清空查询缓存，建议你采用 **“冷热对比法”** 来进行更客观的测试：
 
 **方案 A：测“热数据”性能（推荐，最贴近生产实况）**
 
@@ -7299,14 +7299,14 @@ graph TD
 
   ```sql
   SELECT * FROM tb_quotation_history_trend_202401 
-  WHERE wind_code = '000002.SZ' AND trade_date = '2024-01-15';
+  WHERE wind_code = '600519.SH' AND trade_date = '2024-01-15';
   ```
 
 - **新表 SQL** (自动路由):
 
   ```sql
   SELECT * FROM tb_quotation_history_hot 
-  WHERE wind_code = '000002.SZ' AND trade_date = '2024-01-15';
+  WHERE wind_code = '600519.SH' AND trade_date = '2024-01-15';
   ```
 
 - **关注点**：
