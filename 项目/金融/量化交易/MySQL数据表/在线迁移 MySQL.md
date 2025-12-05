@@ -7320,6 +7320,8 @@ graph TD
 
 
 
+
+
 ### 性能检验
 
 >hot表追求的是极致的性能，最开始先跟老表来进行性能对比分析
@@ -8114,6 +8116,147 @@ QuotationBenchmarkTest.java
 
 
 
+
+
+
+
+
+
+
+### 覆盖索引优化方案
+
+两张实验表 DDL。
+
+为了保证实验的严谨性，我保留了原表的所有分区结构和配置，仅修改了索引策略。
+
+#### 1. 对照组表：标准索引 (`tb_hot_test_base`)
+
+这张表完全复刻您现在的生产环境结构，只包含基础的唯一索引。作为**性能基准线**。
+
+```sql
+CREATE TABLE `tb_hot_test_base` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '自增主键ID',
+  `wind_code` varchar(20) NOT NULL COMMENT '股票代码',
+  `trade_date` datetime NOT NULL COMMENT '交易时间',
+  `latest_price` decimal(10,4) DEFAULT NULL COMMENT '最新价格',
+  `total_volume` decimal(50,5) DEFAULT NULL COMMENT '总成交量',
+  `average_price` decimal(10,4) DEFAULT NULL COMMENT '均价',
+  `STATUS` tinyint NOT NULL DEFAULT '1' COMMENT '状态',
+  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`,`trade_date`),
+  -- 【原有索引】只包含查询条件，不包含数据，查询时需要“回表”
+  UNIQUE KEY `uniq_windcode_tradedate` (`wind_code`,`trade_date`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+PARTITION BY RANGE  COLUMNS(trade_date)
+(
+ PARTITION p202401 VALUES LESS THAN ('2024-02-01') ENGINE = InnoDB,
+ PARTITION p202402 VALUES LESS THAN ('2024-03-01') ENGINE = InnoDB,
+ PARTITION p202403 VALUES LESS THAN ('2024-04-01') ENGINE = InnoDB,
+ PARTITION p202404 VALUES LESS THAN ('2024-05-01') ENGINE = InnoDB,
+ PARTITION p202405 VALUES LESS THAN ('2024-06-01') ENGINE = InnoDB,
+ PARTITION p202406 VALUES LESS THAN ('2024-07-01') ENGINE = InnoDB,
+ PARTITION p202407 VALUES LESS THAN ('2024-08-01') ENGINE = InnoDB,
+ PARTITION p202408 VALUES LESS THAN ('2024-09-01') ENGINE = InnoDB,
+ PARTITION p202409 VALUES LESS THAN ('2024-10-01') ENGINE = InnoDB,
+ PARTITION p202410 VALUES LESS THAN ('2024-11-01') ENGINE = InnoDB,
+ PARTITION p202411 VALUES LESS THAN ('2024-12-01') ENGINE = InnoDB,
+ PARTITION p202412 VALUES LESS THAN ('2025-01-01') ENGINE = InnoDB,
+ PARTITION p202501 VALUES LESS THAN ('2025-02-01') ENGINE = InnoDB,
+ PARTITION p202502 VALUES LESS THAN ('2025-03-01') ENGINE = InnoDB,
+ PARTITION p202503 VALUES LESS THAN ('2025-04-01') ENGINE = InnoDB,
+ PARTITION p_future VALUES LESS THAN (MAXVALUE) ENGINE = InnoDB
+);
+```
+
+------
+
+#### 2. 实验组表：覆盖索引 (`tb_hot_test_cover`)
+
+这张表增加了一个专门的覆盖索引。
+
+- **注意**：我保留了 `uniq_windcode_tradedate` 是为了保证数据写入时的唯一性约束（业务逻辑），但在查询时，MySQL 会自动选择下面的 `idx_covering_perf`。
+
+```sql
+CREATE TABLE `tb_hot_test_cover` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT COMMENT '自增主键ID',
+  `wind_code` varchar(20) NOT NULL COMMENT '股票代码',
+  `trade_date` datetime NOT NULL COMMENT '交易时间',
+  `latest_price` decimal(10,4) DEFAULT NULL COMMENT '最新价格',
+  `total_volume` decimal(50,5) DEFAULT NULL COMMENT '总成交量',
+  `average_price` decimal(10,4) DEFAULT NULL COMMENT '均价',
+  `STATUS` tinyint NOT NULL DEFAULT '1' COMMENT '状态',
+  `create_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP,
+  `update_time` timestamp NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`,`trade_date`),
+  
+  -- 保留原有唯一索引用于约束数据完整性
+  UNIQUE KEY `uniq_windcode_tradedate` (`wind_code`,`trade_date`),
+  
+  -- 【新增覆盖索引】
+  -- 包含：查询条件(wind_code, trade_date) + 业务数据(latest_price, total_volume, average_price)
+  -- 排除：create_time, update_time, STATUS
+  -- 效果：查询这几个字段时，直接从索引树读取，无需回表
+  KEY `idx_covering_perf` (`wind_code`,`trade_date`,`latest_price`,`total_volume`,`average_price`)
+  
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci
+PARTITION BY RANGE  COLUMNS(trade_date)
+(
+ PARTITION p202401 VALUES LESS THAN ('2024-02-01') ENGINE = InnoDB,
+ PARTITION p202402 VALUES LESS THAN ('2024-03-01') ENGINE = InnoDB,
+ PARTITION p202403 VALUES LESS THAN ('2024-04-01') ENGINE = InnoDB,
+ PARTITION p202404 VALUES LESS THAN ('2024-05-01') ENGINE = InnoDB,
+ PARTITION p202405 VALUES LESS THAN ('2024-06-01') ENGINE = InnoDB,
+ PARTITION p202406 VALUES LESS THAN ('2024-07-01') ENGINE = InnoDB,
+ PARTITION p202407 VALUES LESS THAN ('2024-08-01') ENGINE = InnoDB,
+ PARTITION p202408 VALUES LESS THAN ('2024-09-01') ENGINE = InnoDB,
+ PARTITION p202409 VALUES LESS THAN ('2024-10-01') ENGINE = InnoDB,
+ PARTITION p202410 VALUES LESS THAN ('2024-11-01') ENGINE = InnoDB,
+ PARTITION p202411 VALUES LESS THAN ('2024-12-01') ENGINE = InnoDB,
+ PARTITION p202412 VALUES LESS THAN ('2025-01-01') ENGINE = InnoDB,
+ PARTITION p202501 VALUES LESS THAN ('2025-02-01') ENGINE = InnoDB,
+ PARTITION p202502 VALUES LESS THAN ('2025-03-01') ENGINE = InnoDB,
+ PARTITION p202503 VALUES LESS THAN ('2025-04-01') ENGINE = InnoDB,
+ PARTITION p_future VALUES LESS THAN (MAXVALUE) ENGINE = InnoDB
+);
+```
+
+------
+
+#### 3. 下一步：如何导数据进行测试
+
+创建完表后，您需要从原表导入同样的数据量（建议导入最近3个月的数据即可，太大导数据慢）来对比。
+
+**执行数据导入（示例）：**
+
+```sql
+-- 1. 向基准表导入 2024年1月-3月的数据
+INSERT INTO tb_hot_test_base 
+SELECT * FROM tb_quotation_history_hot PARTITION (p202401, p202402, p202403);
+
+-- 2. 向覆盖索引表导入 2024年1月-3月的数据
+-- 注意：这一步会比上面慢，因为要写那个巨大的索引
+INSERT INTO tb_hot_test_cover 
+SELECT * FROM tb_quotation_history_hot PARTITION (p202401, p202402, p202403);
+```
+
+**测试查询 SQL（确保只查覆盖索引包含的字段）：**
+
+```sql
+-- 测试基准表 (会回表)
+SELECT wind_code, trade_date, latest_price, total_volume, average_price 
+FROM tb_hot_test_base 
+WHERE wind_code = '600519.SH' 
+AND trade_date BETWEEN '2024-01-01' AND '2024-03-31';
+
+-- 测试覆盖索引表 (理论上 Using index)
+SELECT wind_code, trade_date, latest_price, total_volume, average_price 
+FROM tb_hot_test_cover 
+WHERE wind_code = '600519.SH' 
+AND trade_date BETWEEN '2024-01-01' AND '2024-03-31';
+```
+
+您可以先执行这两个 Create Table 语句，然后告诉我是否需要帮助构建“自动预热”脚本？
 
 
 
