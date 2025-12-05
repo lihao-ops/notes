@@ -8317,27 +8317,210 @@ MySQL 的优化器在选择索引时有个潜规则（大约值，视版本和�
 
 ###### 测试查询 SQL（确保只查覆盖索引包含的字段）：
 
-```sql
--- 测试基准表 (会回表)
-SELECT wind_code, trade_date, latest_price, total_volume, average_price 
-FROM tb_hot_test_base 
-WHERE wind_code = '600519.SH' 
-AND trade_date BETWEEN '2024-01-01' AND '2024-03-31';
+这份注释方案旨在帮助你透彻理解这个测试类的**设计哲学、验证逻辑以及底层的 SQL 执行过程**。
 
--- 测试覆盖索引表 (理论上 Using index)
-SELECT wind_code, trade_date, latest_price, total_volume, average_price 
-FROM tb_hot_test_cover 
-WHERE wind_code = '600519.SH' 
-AND trade_date BETWEEN '2024-01-01' AND '2024-03-31';
+你可以将以下内容添加到你的类头部作为文档，或者用于项目汇报。
+
+
+
+##### 执行步骤(纯SQL)
+
+###### 一、 测试类核心文档注释
+
+建议添加在 `IndexHeavyTest` 类定义的上方：
+
+```java
+/**
+ * 核心压测类：数据库覆盖索引 (Covering Index) vs 普通索引回表 (Table Lookup) 性能对比
+ *
+ * 1. 【测试目的】
+ * 验证在海量数据（2000万+行）场景下，通过"覆盖索引"优化，消除"回表"操作带来的随机磁盘 I/O，
+ * 从而量化评估其对查询性能的提升幅度。
+ *
+ * 2. 【测试场景】
+ * 模拟真实的股票行情查询：查询特定时间段内（3天），一批热门股票（约500只）的量价数据。
+ * - 数据量级：单表 2200万行。
+ * - 查询比例：约占总数据量的 10%（这是优化器最容易“纠结”的区间，最能体现索引价值）。
+ *
+ * 3. 【预期结果 (Hypothesis)】
+ * - Round 1 (普通索引): 
+ * MySQL 走二级索引 `uniq_windcode_tradedate` 定位 ID，但必须回表读取 `latest_price` 等字段。
+ * 预期现象：Optimizer Trace 显示 index_only=false，物理 I/O 高（产生大量随机读取），耗时较长。
+ * - Round 2 (覆盖索引): 
+ * MySQL 走二级索引 `idx_covering_perf`，所需字段全在索引树上。
+ * 预期现象：Optimizer Trace 显示 index_only=true，物理 I/O 极低（甚至为0），耗时极短。
+ *
+ * 4. 【评估标准】
+ * - 核心指标：物理 I/O (Innodb_data_reads)。这是比时间更“硬”的指标，不受 CPU 波动影响。
+ * - 辅助指标：执行耗时 (ms)。
+ * - 验证手段：Optimizer Trace 中的 `index_only: true/false` 标记。
+ *
+ * 5. 【技术亮点】
+ * - 流式查询 (Stream): 使用 RowCallbackHandler 防止将 20万行数据加载进内存导致 OOM。
+ * - 深度追踪 (Trace): 集成 MySQL Optimizer Trace 捕获优化器决策成本 (Cost)。
+ * - 动态采样: 自动计算 10% 数据量，确保测试的科学性。
+ */
+@SpringBootTest
+public class IndexHeavyTest { ... }
+```
+
+------
+
+###### 二、 关键代码段的思路注释
+
+建议添加在 `runHeavyBenchmark` 方法内部，帮助阅读代码的人理解每一步在干什么：
+
+```java
+    @Test
+    public void runHeavyBenchmark() {
+        // ... (日志打印) ...
+
+        // -----------------------------------------------------------------------
+        // [Step 1] 动态数据准备
+        // 目的：制造一个"既不能全表扫描，又不能只读几行"的尴尬区间(10%-15%)。
+        // 在这个区间下，如果索引设计不好，MySQL会被迫进行大量的随机磁盘 I/O。
+        // -----------------------------------------------------------------------
+        int limitSize = Math.max(1, (int) (allCodes.size() * TEST_DATA_RATIO));
+        List<String> targetCodes = allCodes.subList(0, limitSize);
+        
+        // ... (SQL 定义) ...
+
+        // =======================================================================
+        // [Round 1] 测试普通索引表 (tb_hot_test_base)
+        // 预期行为：二级索引 -> 获取主键ID -> 回主键索引查数据页 (回表)
+        // =======================================================================
+        
+        // 1.1 [验证阶段] 开启 Trace，询问 MySQL 优化器："你打算怎么查？"
+        // 这一步只做 Explain，不产生真实数据 I/O，为了拿到 cost 和 index_only 状态。
+        runOptimizerTrace(sqlBase, params, "tb_hot_test_base");
+
+        // 1.2 [快照阶段] 记录当前的磁盘读取次数 (基准线)
+        long startReadsBase = getPhysicalReads();
+
+        // 1.3 [压测阶段] 真实执行 SQL
+        // 注意：使用流式处理 (lambda) 遍历 ResultSet，只计数不存储，避免 Java 堆内存溢出(OOM)。
+        stopWatch.start("普通索引(回表)");
+        Integer rowCountBase = namedJdbcTemplate.query(sqlBase, params, rs -> { ... });
+        stopWatch.stop();
+
+        // 1.4 [结算阶段] 当前 I/O - 基准 I/O = 本次查询产生的真实物理 I/O
+        long ioCostBase = getPhysicalReads() - startReadsBase;
+
+
+        // =======================================================================
+        // [Round 2] 测试覆盖索引表 (tb_hot_test_cover)
+        // 预期行为：二级索引直接提供所有数据 (零回表)
+        // =======================================================================
+        
+        // ... (逻辑同上，预期 I/O 应接近 0) ...
+    }
+```
+
+------
+
+
+
+###### 三、 完整执行的纯 SQL 流程 (Simulation)
+
+这是 Java 代码在数据库层面实际执行的操作序列。你可以把这个发给 DBA 或者想在 Navicat/MySQL Workbench 里手动复现的人。
+
+> **定义变量（模拟 Java 中的参数替换）：**
+
+```sql
+-- 1. 定义查询范围变量
+SET @start_date = '2025-01-01 00:00:00';
+SET @end_date   = '2025-01-03 23:59:59';
+
+-- 定义股票代码列表 (Java中是500个，这里用变量简略表示)
+-- 实际执行时，IN (...) 里面会是具体的 '000001.SZ', '000002.SZ'...
+SET @code_list  = ('001222.SZ', '001223.SZ', '...', '688143.SH'); 
 ```
 
 
 
-###### 使用真实的股票列表制造 I/O 压力，对比覆盖索引与回表的性能差异。
+> **Round 1: 普通索引测试流程**
+
+```sql
+-- [Step 1.1] 开启优化器追踪 (只在当前会话生效)
+SET SESSION optimizer_trace='enabled=on';
+
+-- [Step 1.2] 执行计划分析 (Java代码中的 runOptimizerTrace)
+EXPLAIN SELECT wind_code, trade_date, latest_price, total_volume, average_price 
+FROM tb_hot_test_base 
+WHERE wind_code IN (@code_list) 
+AND trade_date BETWEEN @start_date AND @end_date;
+
+-- [Step 1.3] 获取追踪结果 (查看 index_only 是否为 false)
+SELECT TRACE FROM information_schema.OPTIMIZER_TRACE;
+SELECT Variable_name, Value FROM performance_schema.session_status WHERE Variable_name = 'Last_query_cost';
+
+-- [Step 1.4] 记录物理 I/O 初始值 (Start Reads)
+SHOW STATUS LIKE 'Innodb_data_reads';
+
+-- [Step 1.5] 真实执行查询 (压测核心)
+SELECT wind_code, trade_date, latest_price, total_volume, average_price 
+FROM tb_hot_test_base 
+WHERE wind_code IN (@code_list) 
+AND trade_date BETWEEN @start_date AND @end_date;
+
+-- [Step 1.6] 获取物理 I/O 结束值 (End Reads)
+-- 计算：End Reads - Start Reads = 本次查询消耗的磁盘读取
+SHOW STATUS LIKE 'Innodb_data_reads';
+
+-- [Step 1.7] 关闭追踪
+SET SESSION optimizer_trace='enabled=off';
+```
+
+
+
+> **Round 2: 覆盖索引测试流程**
+
+```sql
+-- [Step 2.1] 开启追踪
+SET SESSION optimizer_trace='enabled=on';
+
+-- [Step 2.2] 执行计划分析
+EXPLAIN SELECT wind_code, trade_date, latest_price, total_volume, average_price 
+FROM tb_hot_test_cover 
+WHERE wind_code IN (@code_list) 
+AND trade_date BETWEEN @start_date AND @end_date;
+
+-- [Step 2.3] 获取追踪结果 (重点：这里应该看到 index_only: true)
+SELECT TRACE FROM information_schema.OPTIMIZER_TRACE;
+SELECT Variable_name, Value FROM performance_schema.session_status WHERE Variable_name = 'Last_query_cost';
+
+-- [Step 2.4] 记录物理 I/O 初始值
+SHOW STATUS LIKE 'Innodb_data_reads';
+
+-- [Step 2.5] 真实执行查询 (你会发现这个极其快)
+SELECT wind_code, trade_date, latest_price, total_volume, average_price 
+FROM tb_hot_test_cover 
+WHERE wind_code IN (@code_list) 
+AND trade_date BETWEEN @start_date AND @end_date;
+
+-- [Step 2.6] 获取物理 I/O 结束值
+-- 预期结果：差值极小，接近于 0
+SHOW STATUS LIKE 'Innodb_data_reads';
+
+-- [Step 2.7] 清理现场
+SET SESSION optimizer_trace='enabled=off';
+```
 
 
 
 
+
+#### 4.测试报告
+
+
+
+##### 未重启
+
+
+
+
+
+##### 0缓存
 
 
 
