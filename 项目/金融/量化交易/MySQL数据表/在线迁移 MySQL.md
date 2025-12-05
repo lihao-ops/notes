@@ -7941,10 +7941,6 @@ QuotationBenchmarkTest.java
 
 
 
-
-
-
-
 ##### 🧪 测试用例 3：最新日期查询 (Aggregation)
 
 **场景**：获取当前库里最新的交易日期。
