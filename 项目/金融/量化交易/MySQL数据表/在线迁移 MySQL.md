@@ -7030,6 +7030,111 @@ public List<Data> queryNewTable() { ... }
 
 
 
+### 维度五：回归测试 + 新插入验证
+
+>插入最新的数据直接插入到hot表中！
+
+
+
+你的思路非常严谨且正确！这是非常标准的 **“回归测试 + 新功能验证”** 流程。
+
+做完这两步验证，你就可以彻底放心地把这套系统交付给生产环境自动运行了。
+
+请直接在数据库执行以下三组 SQL，一目了然：
+
+
+
+#### 第一步：回归验证（确认 11 月数据没丢）
+
+虽然日志里已经确认过了，但再手工查一次是最安心的。
+
+```sql
+-- 1. 查旧表 2025年11月 总数
+SELECT 'Old_202511' AS source, COUNT(*) AS cnt 
+FROM tb_quotation_history_trend_202511
+UNION ALL
+-- 2. 查新表 2025年11月 分区总数
+SELECT 'New_Partition_202511' AS source, COUNT(*) AS cnt 
+FROM tb_quotation_history_hot PARTITION (p202511);
+```
+
+- **预期结果**：两个 `cnt` 数字**完全一致**。
+
+
+
+>完全一致
+
+```bash
+#source	cnt
+#Old_202511	        24451024
+#New_Partition_202511	24451024
+```
+
+
+
+
+
+------
+
+#### 第二步：落地验证（确认 12 月新数据进对了房间）
+
+这是验证“自动路由”是否生效的关键。
+
+```sql
+-- 1. 查新表 2025年12月 分区（你应该看到刚插入的数据量）
+SELECT 'New_Partition_202512' AS source, COUNT(*) AS cnt 
+FROM tb_quotation_history_hot PARTITION (p202512)
+UNION ALL
+-- 2. 查未来分区（防止数据溢出到了 p_future，这里应该是 0）
+SELECT 'Future_Partition' AS source, COUNT(*) AS cnt 
+FROM tb_quotation_history_hot PARTITION (p_future);
+```
+
+- **预期结果**：
+  - `New_Partition_202512` 的数量 = 你刚刚插入的数据条数（比如 3000）。
+  - `Future_Partition` 的数量 = **0**。
+
+>通过
+
+```bash
+source	cnt
+New_Partition_202512	4853764
+Future_Partition		0
+```
+
+
+
+
+
+------
+
+#### 第三步：结论
+
+如果上述两步验证通过，那么结论就是：
+
+1. **历史无损**：以前迁移的数据（11月）安然无恙。
+2. **路由精准**：新插入的数据（12月）自动找对了 `p202512` 房间，没有跑偏。
+
+以后操作准则：
+
+**是的，只管无脑插入！**
+
+在代码中，你只需要构建标准的 INSERT INTO tb_quotation_history_hot (...) 语句，完全不需要关心分区名，**MySQL 底层已经证明了它能完美接管这一切**。
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### 最终删除旧表
 
 
@@ -7922,7 +8027,7 @@ QuotationBenchmarkTest.java
 
 
 
-# 书签
+
 
 #### 🚀 阶段二：覆盖索引 (Covering Index) 专项优化
 
@@ -8346,7 +8451,7 @@ graph TD
     * 每个叶子节点存 16 行数据。
     
     * **总行数公式：**
-        
+      
         * $$
             Total = \text{Leaf Capacity} \times \text{FanOut} \times \text{FanOut}
             $$
@@ -8354,7 +8459,7 @@ graph TD
     * 
     
     * **代入数值：**
-        
+      
         * $$
             16(每页16K / 每行1K) \times 1099(扇出) \times 1099 \approx 19,324,816
             $$
