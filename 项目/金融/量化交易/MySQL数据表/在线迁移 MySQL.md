@@ -8245,22 +8245,61 @@ PARTITION BY RANGE  COLUMNS(trade_date)
 
 #### 3. 下一步：如何导数据进行测试
 
-创建完表后，您需要从原表导入同样的数据量（建议导入最近3个月的数据即可，太大导数据慢）来对比。
+创建完表后，您需要从原表导入同样的数据量来对比。
 
-**执行数据导入（示例）：**
 
-```sql
--- 1. 向基准表导入 2024年1月-3月的数据
-INSERT INTO tb_hot_test_base 
-SELECT * FROM tb_quotation_history_hot PARTITION (p202401, p202402, p202403);
 
--- 2. 向覆盖索引表导入 2024年1月-3月的数据
--- 注意：这一步会比上面慢，因为要写那个巨大的索引
-INSERT INTO tb_hot_test_cover 
-SELECT * FROM tb_quotation_history_hot PARTITION (p202401, p202402, p202403);
+##### 执行数据导入
+
+共计行数: 22644365每个表
+
+>tb_hot_test_base
+
+```bash
+pt-archiver \
+  --source h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202501,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.86,P=3306,D=a_share_quant,t=tb_hot_test_base,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2025-01-01' AND trade_date < '2025-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
 ```
 
-**测试查询 SQL（确保只查覆盖索引包含的字段）：**
+
+
+
+
+>tb_hot_test_cover(-- 注意：这一步会比上面慢，因为要写那个巨大的索引)
+
+```bash
+pt-archiver \
+  --source h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202501,u=hli_gho,p=Q836184425 \
+  --dest   h=10.100.224.86,P=3306,D=a_share_quant,t=tb_hot_test_cover,u=hli_gho,p=Q836184425 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "trade_date >= '2025-01-01' AND trade_date < '2025-02-01'" \
+  --limit 10000 \
+  --commit-each \
+  --progress 20000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+
+
+
+
+##### 测试检验
+
+
+
+###### 测试查询 SQL（确保只查覆盖索引包含的字段）：
 
 ```sql
 -- 测试基准表 (会回表)
@@ -8276,7 +8315,7 @@ WHERE wind_code = '600519.SH'
 AND trade_date BETWEEN '2024-01-01' AND '2024-03-31';
 ```
 
-您可以先执行这两个 Create Table 语句，然后告诉我是否需要帮助构建“自动预热”脚本？
+
 
 
 
