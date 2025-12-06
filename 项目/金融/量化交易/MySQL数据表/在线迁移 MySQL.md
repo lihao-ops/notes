@@ -9174,6 +9174,27 @@ SET sql_log_bin = 1;
 
 #### 大表迁移
 
+
+
+>MySQL 默认是**禁止**从客户端读取本地文件的（防止恶意客户端读取服务器文件）。
+
+需要**同时**在“服务端（MySQL）”和“客户端（pt-archiver）”开启这个权限。
+
+```sql
+-- 1. 查看当前状态（多半是 OFF）
+SHOW GLOBAL VARIABLES LIKE 'local_infile';
+
+
+-- 2. 开启它 (立即生效，无需重启)
+SET GLOBAL local_infile = 1;
+```
+
+
+
+>在 pt-archiver 命令中开启权限
+
+在 `pt-archiver` 中，需要在连接参数里加上 **`L=1`** （代表 Local Infile = True）。
+
 ```bash
 pt-archiver \
   --source h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
@@ -9215,7 +9236,8 @@ pt-archiver \
   --limit 10000 \
   --commit-each \
   --bulk-insert \
-  --progress 20000 \
+  --set-vars sql_log_bin=0 \
+  --progress 50000 \
   --no-delete \
   --charset utf8 \
   --statistics
