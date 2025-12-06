@@ -1830,6 +1830,168 @@ PARTITION BY RANGE COLUMNS(trade_date) (
 
 
 
+#### 查看当前change buffer大小
+
+>查看比例配置大小(默认是25%)
+
+要查看当前 Change Buffer 的**配置上限**和**实际使用量**，请使用以下方法：
+
+```sql
+SHOW VARIABLES LIKE 'innodb_change_buffer_max_size';
+```
+
+
+
+```bash
+Variable_name	Value
+innodb_change_buffer_max_size	25
+```
+
+说明它就是：
+$$
+Buffer Pool大小 * 25% = Change Pool大小
+$$
+
+
+>查看实际ChangeBuffer占用大小
+
+Change Buffer 的内存是动态分配的，它不会一上来就占满 12GB，而是用多少占多少。
+
+```sql
+SHOW ENGINE INNODB STATUS;
+```
+
+```bash
+Type	Name	Status
+InnoDB		
+=====================================
+2025-12-06 19:32:51 0xe34 INNODB MONITOR OUTPUT
+=====================================
+Per second averages calculated from the last 37 seconds
+-----------------
+BACKGROUND THREAD
+-----------------
+srv_master_thread loops: 3189 srv_active, 0 srv_shutdown, 13205 srv_idle
+srv_master_thread log flush and writes: 0
+----------
+SEMAPHORES
+----------
+OS WAIT ARRAY INFO: reservation count 590183
+OS WAIT ARRAY INFO: signal count 295807
+RW-shared spins 0, rounds 0, OS waits 0
+RW-excl spins 0, rounds 0, OS waits 0
+RW-sx spins 0, rounds 0, OS waits 0
+Spin rounds per wait: 0.00 RW-shared, 0.00 RW-excl, 0.00 RW-sx
+------------
+TRANSACTIONS
+------------
+Trx id counter 1893584
+Purge done for trx's n:o < 1893580 undo n:o < 0 state: running but idle
+History list length 1
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION 283773295795848, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 283773295795072, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 283773295797400, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 283773295798176, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 283773295796624, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 283773295794296, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+---TRANSACTION 283773295793520, not started
+0 lock struct(s), heap size 1128, 0 row lock(s)
+--------
+FILE I/O
+--------
+I/O thread 0 state: wait Windows aio (insert buffer thread)
+I/O thread 1 state: wait Windows aio (read thread)
+I/O thread 2 state: wait Windows aio (read thread)
+I/O thread 3 state: wait Windows aio (read thread)
+I/O thread 4 state: wait Windows aio (read thread)
+I/O thread 5 state: wait Windows aio (write thread)
+I/O thread 6 state: wait Windows aio (write thread)
+I/O thread 7 state: wait Windows aio (write thread)
+I/O thread 8 state: wait Windows aio (write thread)
+Pending normal aio reads: [0, 0, 0, 0] , aio writes: [0, 0, 0, 0] ,
+ ibuf aio reads:
+Pending flushes (fsync) log: 0; buffer pool: 0
+9968925 OS file reads, 7862202 OS file writes, 765133 OS fsyncs
+0.08 reads/s, 16384 avg bytes/read, 2.69 writes/s, 1.80 fsyncs/s
+-------------------------------------
+INSERT BUFFER AND ADAPTIVE HASH INDEX
+-------------------------------------
+Ibuf: size 1, free list len 3081, seg size 3083, 0 merges
+merged operations:
+ insert 0, delete mark 0, delete 0
+discarded operations:
+ insert 0, delete mark 0, delete 0
+Hash table size 1106407, node heap has 0 buffer(s)
+Hash table size 1106407, node heap has 1 buffer(s)
+Hash table size 1106407, node heap has 1 buffer(s)
+Hash table size 1106407, node heap has 0 buffer(s)
+Hash table size 1106407, node heap has 0 buffer(s)
+Hash table size 1106407, node heap has 1 buffer(s)
+Hash table size 1106407, node heap has 0 buffer(s)
+Hash table size 1106407, node heap has 1 buffer(s)
+0.70 hash searches/s, 1.65 non-hash searches/s
+---
+LOG
+---
+Log sequence number          872449017904
+Log buffer assigned up to    872449017904
+Log buffer completed up to   872449017904
+Log written up to            872449017904
+Log flushed up to            872449017904
+Added dirty pages up to      872449017904
+Pages flushed up to          872449017904
+Last checkpoint at           872449017904
+Log minimum file id is       266393
+Log maximum file id is       266416
+5993958 log i/o's done, 0.70 log i/o's/second
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Total large memory allocated 0
+Dictionary memory allocated 3271663
+Buffer pool size   262112
+Free buffers       172350
+Database pages     89750
+Old database pages 33110
+Modified db pages  0
+Pending reads      0
+Pending writes: LRU 0, flush list 0, single page 0
+Pages made young 180947, not young 274906432
+0.27 youngs/s, 0.46 non-youngs/s
+Pages read 9968484, created 1393426, written 1434511
+0.08 reads/s, 0.03 creates/s, 1.29 writes/s
+Buffer pool hit rate 996 / 1000, young-making rate 13 / 1000 not 23 / 1000
+Pages read ahead 0.00/s, evicted without access 0.00/s, Random read ahead 0.00/s
+LRU len: 89750, unzip_LRU len: 0
+I/O sum[63]:cur[0], unzip sum[0]:cur[0]
+--------------
+ROW OPERATIONS
+--------------
+0 queries inside InnoDB, 0 queries in queue
+0 read views open inside InnoDB
+Process ID=7300, Main thread ID=9172 , state=sleeping
+Number of rows inserted 205874520, updated 1727, deleted 1, read 1940636387
+0.00 inserts/s, 0.11 updates/s, 0.00 deletes/s, 2.03 reads/s
+Number of system rows inserted 926, updated 1002, deleted 501, read 20501
+0.00 inserts/s, 0.00 updates/s, 0.00 deletes/s, 0.00 reads/s
+----------------------------
+END OF INNODB MONITOR OUTPUT
+============================
+```
+
+
+
+
+
+
+
 #### 快速清空Binlog
 
 >在迁移过程中BinLog是累积最快的日志文件
