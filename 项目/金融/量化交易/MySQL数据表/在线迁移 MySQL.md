@@ -7204,6 +7204,22 @@ DROP TABLE IF EXISTS tb_quotation_history_trend_202209;
 DROP TABLE IF EXISTS tb_quotation_history_trend_202210;
 DROP TABLE IF EXISTS tb_quotation_history_trend_202211;
 DROP TABLE IF EXISTS tb_quotation_history_trend_202212;
+
+
+-- 删除 2024 年剩余的所有旧分表
+DROP TABLE IF EXISTS 
+    `tb_quotation_history_trend_202401`,
+    `tb_quotation_history_trend_202402`,
+    `tb_quotation_history_trend_202403`,
+    `tb_quotation_history_trend_202404`,
+    `tb_quotation_history_trend_202405`,
+    `tb_quotation_history_trend_202406`,
+    `tb_quotation_history_trend_202407`,
+    `tb_quotation_history_trend_202408`,
+    `tb_quotation_history_trend_202409`,
+    `tb_quotation_history_trend_202410`,
+    `tb_quotation_history_trend_202411`,
+    `tb_quotation_history_trend_202412`;
 ```
 
 
@@ -9199,6 +9215,10 @@ SET GLOBAL local_infile = 1;
 
 >迁移命令加上了bulk-insert，加上了set-vars sql_log_bin=0
 
+
+
+>tb_quotation_history_warm1
+
 ```bash
 pt-archiver \
   --source h=172.31.192.1,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425,L=1 \
@@ -9217,6 +9237,8 @@ pt-archiver \
 
 
 
+>tb_quotation_history_hot1
+
 ```bash
 pt-archiver \
   --source h=172.31.192.1,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425,L=1 \
@@ -9232,16 +9254,6 @@ pt-archiver \
   --charset utf8 \
   --statistics
 ```
-
-
-
-```bash
-
-```
-
-`tb_quotation_history_trend_202502`
-
-`tb_hot_test_cover`
 
 
 
