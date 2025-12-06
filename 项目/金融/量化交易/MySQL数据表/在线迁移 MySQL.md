@@ -9112,9 +9112,59 @@ SET sql_log_bin = 1;
 
 
 
-##### 改tb_quotation_history_hot
+##### 改tb_quotation_history_hot(覆盖索引一并改了)
+
+```sql
+--Step 1: 防止连接超时 (Hot表可能数据也不少，设长一点保险)
+SET SESSION net_read_timeout = 86400;
+SET SESSION net_write_timeout = 86400;
+SET SESSION wait_timeout = 86400;
+
+--Step 2: 关闭 Binlog (加速写入，减少磁盘IO)
+SET sql_log_bin = 0;
+
+--Step 3: 【核心操作】修改精度 + 添加索引 (一次性完成)
+ALTER TABLE `tb_quotation_history_hot`
+
+-- [动作 1] 瘦身字段：从 50,5 改为 16,5，每行立省 15 Bytes
+MODIFY COLUMN `total_volume` DECIMAL(16, 5) DEFAULT NULL COMMENT '总成交量',
+
+-- [动作 2] 添加覆盖索引：直接利用瘦身后的字段
+-- 包含：代码、时间、最新价、成交量、均价
+ADD KEY `idx_covering_perf` (`wind_code`,`trade_date`,`latest_price`,`total_volume`,`average_price`),
+
+-- [强制参数] 使用 Copy 算法重建表
+ALGORITHM=COPY;
+
+--Step 4: 恢复 Binlog
+SET sql_log_bin = 1;
+```
 
 
+
+#### 2、hot表添加覆盖索引
+
+```sql
+--Step 1: 防止连接超时 (Hot表可能数据也不少，设长一点保险)
+SET SESSION net_read_timeout = 86400;
+SET SESSION net_write_timeout = 86400;
+SET SESSION wait_timeout = 86400;
+
+--Step 2: 关闭 Binlog (加速写入，减少磁盘IO)
+SET sql_log_bin = 0;
+
+--Step 3: 【核心操作】添加索引
+ALTER TABLE `tb_quotation_history_hot`
+
+-- 包含：代码、时间、最新价、成交量、均价
+ADD KEY `idx_covering_perf` (`wind_code`,`trade_date`,`latest_price`,`total_volume`,`average_price`),
+
+-- [强制参数] 使用 Copy 算法重建表
+ALGORITHM=COPY;
+
+--Step 4: 恢复 Binlog
+SET sql_log_bin = 1;
+```
 
 
 
