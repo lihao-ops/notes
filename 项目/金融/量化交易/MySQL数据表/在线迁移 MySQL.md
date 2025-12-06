@@ -8982,15 +8982,73 @@ innodb_buffer_pool_instances = 16 # 建议设置为内存GB数的 1/2 或 1/4，
 
 
 
-##### 最终实践
+### 最终实践
 
 
 
-###### 1、字段大小调整合理
+#### 1、字段大小调整合理
 
-> 首先调整`DECIMAL(50,5)`
+>首先调整`DECIMAL(50,5)`
 
 
+
+##### 查询两个表最大total_volume的数据长度
+
+```sql
+SELECT 
+    MAX(total_volume) AS max_vol, 
+    MAX(LENGTH(CAST(FLOOR(total_volume) AS CHAR))) AS max_int_len 
+FROM `tb_quotation_history_warm`;
+
+#
+SELECT 
+    MAX(total_volume) AS max_vol, 
+    MAX(LENGTH(CAST(FLOOR(total_volume) AS CHAR))) AS max_int_len 
+FROM `tb_quotation_history_hot`;
+```
+
+
+
+###### tb_quotation_history_warm
+
+```bash
+max_vol max_int_len
+
+4253775.37000 7
+```
+
+
+
+###### tb_quotation_history_hot
+
+```bash
+max_vol max_int_len
+
+6581905.80000 7
+```
+
+
+
+###### 数据诊断 (Diagnosis)
+
+- **现状：** `max_vol` 约为 **658 万**（7 位整数）。
+- **你预留的空间：** `DECIMAL(50, 5)`。
+  - 整数位预留了 **45 位**。哪怕全世界的钱加起来，或者地球上的沙子总数，都填不满这个字段。
+  - 小数位预留了 **5 位**。但你的数据显示有效位只有 **1~2 位**（`.80` 和 `.37`），后面的 `000` 都是浪费。
+
+
+
+###### 优化方案对比 (Solution)
+
+为了在“极致性能”和“未来安全”之间找平衡，我推荐以下两个档位。
+
+> 方案 A：极致瘦身版 (强烈推荐) —— `DECIMAL(16, 2)`
+
+- **配置：** 14 位整数 + 2 位小数。
+- **容量上限：** **100 兆 (100 Trillion)**。
+  - 你的最大值是 658 万。哪怕你的业务增长 **1000 万倍**，这个字段依然够用。
+- **占用空间：** **8 Bytes**。
+- **对比原方案：** 从 23 Bytes 降到 8 Bytes。**节省 65% 的空间！**
 
 
 
