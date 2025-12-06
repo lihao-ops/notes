@@ -9089,6 +9089,37 @@ max_vol max_int_len
 
 
 
+##### 改tb_quotation_history_warm
+
+```sql
+-- 1. 设置超长的连接超时时间 (设置为 8 小时，防止跑一半断开)
+SET SESSION net_read_timeout = 28800;
+SET SESSION net_write_timeout = 28800;
+SET SESSION wait_timeout = 28800;
+
+-- 2. 关闭 Binlog 加速写入 (这一步能帮你省下至少 20 分钟)
+SET sql_log_bin = 0;
+
+-- 3. 执行修改 (预估耗时 2.5 小时)
+-- 建议你点击执行后，去吃个饭或者做点别的事，不要一直盯着屏幕
+ALTER TABLE `tb_quotation_history_warm` 
+MODIFY COLUMN `total_volume` DECIMAL(16, 5) DEFAULT NULL COMMENT '总成交量',
+ALGORITHM=COPY;
+
+-- 4. 恢复 Binlog (跑完后再执行)
+SET sql_log_bin = 1;
+```
+
+
+
+##### 改tb_quotation_history_hot
+
+
+
+
+
+
+
 
 
 ### 问答
