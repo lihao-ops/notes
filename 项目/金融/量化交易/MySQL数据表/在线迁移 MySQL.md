@@ -9463,6 +9463,8 @@ MySQL 8.0 默认开启了**缓冲池状态保存与恢复**功能。
 
 ### 1.设置75%的Buffer Pool
 
+​	官方文档有时候比较保守（建议 50%-75%），但在 **专用数据库服务器（Dedicated DB Server）** 上，经验丰富的 DBA 通常会给到 **70% ~ 80%**。
+
 >查询当前MySQL的Buffer Pool
 
 ```sql
@@ -9471,14 +9473,12 @@ SELECT
     ROUND(@@innodb_buffer_pool_size / 1024 / 1024 / 1024, 2) AS 'Buffer Pool (GB)';
 ```
 
-
-
 ```sql
 Buffer Pool (Bytes)	Buffer Pool (GB)
 4294967296	4.00
 ```
 
-
+当前`Buffer Pool`是4GB，也就是说change buffer 25% = 1GB
 
 
 
