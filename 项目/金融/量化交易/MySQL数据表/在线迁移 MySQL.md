@@ -9195,42 +9195,14 @@ SET GLOBAL local_infile = 1;
 
 在 `pt-archiver` 中，需要在连接参数里加上 **`L=1`** （代表 Local Infile = True）。
 
-```bash
-pt-archiver \
-  --source h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
-  --dest   h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_warm1,u=hli_gho,p=Q836184425 \
-  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-  --where "1=1" \
-  --limit 10000 \
-  --commit-each \
-  --progress 20000 \
-  --no-delete \
-  --charset utf8 \
-  --statistics
-```
 
 
+>迁移命令加上了bulk-insert，加上了set-vars sql_log_bin=0
 
 ```bash
 pt-archiver \
-  --source h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425 \
-  --dest   h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_hot1,u=hli_gho,p=Q836184425 \
-  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
-  --where "1=1" \
-  --limit 10000 \
-  --commit-each \
-  --progress 20000 \
-  --no-delete \
-  --charset utf8 \
-  --statistics
-```
-
-
-
-```bash
-pt-archiver \
-  --source h=172.31.192.1,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202503,u=hli_gho,p=Q836184425,L=1 \
-  --dest   h=172.31.192.1,P=3306,D=a_share_quant,t=tb_hot_test_cover,u=hli_gho,p=Q836184425,L=1 \
+  --source h=172.31.192.1,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425,L=1 \
+  --dest   h=172.31.192.1,P=3306,D=a_share_quant,t=tb_quotation_history_warm1,u=hli_gho,p=Q836184425,L=1 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "1=1" \
   --limit 10000 \
@@ -9241,6 +9213,30 @@ pt-archiver \
   --no-delete \
   --charset utf8 \
   --statistics
+```
+
+
+
+```bash
+pt-archiver \
+  --source h=172.31.192.1,P=3306,D=a_share_quant,t=tb_quotation_history_hot,u=hli_gho,p=Q836184425,L=1 \
+  --dest   h=172.31.192.1,P=3306,D=a_share_quant,t=tb_quotation_history_hot1,u=hli_gho,p=Q836184425,L=1 \
+  --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
+  --where "1=1" \
+  --limit 10000 \
+  --commit-each \
+  --bulk-insert \
+  --set-vars sql_log_bin=0 \
+  --progress 50000 \
+  --no-delete \
+  --charset utf8 \
+  --statistics
+```
+
+
+
+```bash
+
 ```
 
 `tb_quotation_history_trend_202502`
