@@ -1986,7 +1986,72 @@ END OF INNODB MONITOR OUTPUT
 ============================
 ```
 
+这份 `SHOW ENGINE INNODB STATUS` 的输出非常健康，简直是教科书级别的“空闲且健康”的状态。
 
+针对你刚才关心的 **Change Buffer** 和 **内存配置**，我从这份报告里提取了最关键的信息进行解读：
+
+> 1. Change Buffer 实际占用：很小 (约 48MB)
+
+找到这一节：
+
+Plaintext
+
+```
+-------------------------------------
+INSERT BUFFER AND ADAPTIVE HASH INDEX
+-------------------------------------
+Ibuf: size 1, free list len 3081, seg size 3083, 0 merges
+```
+
+- **关键指标：** `seg size 3083`
+- **计算：** $3083 \text{ (页)} \times 16\text{KB} \approx \mathbf{48.17 MB}$。
+- **结论：**
+  - 你当前的 Buffer Pool 是 4GB，默认 25% 给 Change Buffer（即 1GB 上限）。
+  - 实际只用了 **48MB**。
+  - **原因：** 因为你当前没有正在进行的“大量写入”操作（看 `ROW OPERATIONS` 只有 0.00 inserts/s）。Change Buffer 是在写入压力大时才会涨上去，现在它很清闲。
+
+> 2. Buffer Pool 配置确认：当前是 4GB
+
+找到这一节：
+
+```
+----------------------
+BUFFER POOL AND MEMORY
+----------------------
+Buffer pool size   262112
+```
+
+- **计算：** 
+
+  - $$
+    262112 \text{ (页)} \times 16\text{KB} = 4,193,792 \text{KB} \approx \mathbf{4 GB}
+    $$
+
+- **结论：** 确认你之前执行的 `SET GLOBAL ... = 4294967296` 已经生效了。
+
+### 3. 内存命中率：非常完美 (99.6%)
+
+```
+Buffer pool hit rate 996 / 1000
+```
+
+- **解读：** **99.6%** 的请求都直接命中内存。
+- **Free buffers 172350：** 还有 17万页（约 2.6GB）是空的。
+- **结论：** 说明你的 2600万行数据的索引，此时此刻完全装在内存里，而且内存还绰绰有余（只用了 1.4GB 左右存数据，剩下 2.6GB 都在空着）。
+
+### 4. 磁盘 I/O：风平浪静
+
+Plaintext
+
+```
+--------
+FILE I/O
+--------
+Pending normal aio reads: [0, 0, 0, 0] ...
+Pending flushes (fsync) log: 0; buffer pool: 0
+```
+
+- **解读：** 所有的 Pending（挂起/排队）都是 0。说明磁盘毫无压力，没有任何阻塞。
 
 
 
