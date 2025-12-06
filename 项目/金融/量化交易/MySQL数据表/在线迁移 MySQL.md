@@ -9208,19 +9208,22 @@ pt-archiver \
 
 ```bash
 pt-archiver \
-  --source h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_warm,u=hli_gho,p=Q836184425 \
-  --dest   h=10.100.224.86,P=3306,D=a_share_quant,t=tb_quotation_history_warm1,u=hli_gho,p=Q836184425 \
+  --source h=172.31.192.1,P=3306,D=a_share_quant,t=tb_quotation_history_trend_202503,u=hli_gho,p=Q836184425,L=1 \
+  --dest   h=172.31.192.1,P=3306,D=a_share_quant,t=tb_hot_test_cover,u=hli_gho,p=Q836184425,L=1 \
   --columns wind_code,trade_date,latest_price,total_volume,average_price,status,create_time,update_time,id \
   --where "1=1" \
   --limit 10000 \
   --commit-each \
+  --bulk-insert \
   --progress 20000 \
   --no-delete \
   --charset utf8 \
   --statistics
 ```
 
+`tb_quotation_history_trend_202502`
 
+`tb_hot_test_cover`
 
 
 
