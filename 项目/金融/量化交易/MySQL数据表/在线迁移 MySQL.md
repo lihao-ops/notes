@@ -9457,6 +9457,74 @@ MySQL 8.0 默认开启了**缓冲池状态保存与恢复**功能。
 
 
 
+## 最终验收极致速度
+
+
+
+### 1.设置75%的Buffer Pool
+
+>查询当前MySQL的Buffer Pool
+
+```sql
+SELECT 
+    @@innodb_buffer_pool_size AS 'Buffer Pool (Bytes)',
+    ROUND(@@innodb_buffer_pool_size / 1024 / 1024 / 1024, 2) AS 'Buffer Pool (GB)';
+```
+
+
+
+```sql
+Buffer Pool (Bytes)	Buffer Pool (GB)
+4294967296	4.00
+```
+
+
+
+
+
+
+
+
+
+>不停机运行
+
+```sql
+-- 生产环境下64GB的则 × 75% = 48GB（完美）。
+-- 设置 Buffer Pool 为 4GB (4 * 1024 * 1024 * 1024 = 4294967296)
+SET GLOBAL innodb_buffer_pool_size = 4294967296;
+```
+
+
+
+### 2.预热数据以覆盖索引加载到Buffer Pool
+
+```sql
+-- 强制扫描全年的索引数据，把它们全部加载到内存中
+SELECT COUNT(*) 
+FROM `tb_hot_test_cover` FORCE INDEX(`idx_covering_perf`)
+WHERE `trade_date` >= '2025-01-01' AND `trade_date` < '2025-01-15';
+```
+
+
+
+
+
+
+
+
+
+hot表的千万数据量毫秒级查询
+
+
+
+
+
+
+
+
+
+
+
 
 
 ## 遇到的问题
